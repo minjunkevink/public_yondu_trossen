@@ -486,6 +486,7 @@ class ManipulatorRobot:
             leader_pos[name] = self.leader_arms[name].read("Present_Position")
             leader_pos[name] = torch.from_numpy(leader_pos[name])
             self.logs[f"read_leader_{name}_pos_dt_s"] = time.perf_counter() - before_lread_t
+            # print(f"DEBUG: Leader arm {name} position: {leader_pos[name]}")
 
         # Send goal position to the follower
         follower_goal_pos = {}
@@ -504,8 +505,17 @@ class ManipulatorRobot:
             follower_goal_pos[name] = goal_pos
 
             goal_pos = goal_pos.numpy().astype(np.float32)
+            # print(f"DEBUG: Setting follower arm {name} goal position to: {goal_pos}")
             self.follower_arms[name].write("Goal_Position", goal_pos)
             self.logs[f"write_follower_{name}_goal_pos_dt_s"] = time.perf_counter() - before_fwrite_t
+            
+            # For verification, read back the current position after setting
+            try:
+                current_pos = self.follower_arms[name].read("Present_Position")
+                # print(f"DEBUG: Follower arm {name} current position: {current_pos}")
+            except Exception as e:
+                # print(f"DEBUG: Error reading follower position: {e}")
+                pass
 
         # Early exit when recording data is not requested
         if not record_data:

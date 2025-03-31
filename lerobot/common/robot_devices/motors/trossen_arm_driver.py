@@ -130,8 +130,15 @@ class TrossenArmDriver:
                 f"Failed to configure the driver for the {self.model} arm at {self.ip}."
             )
             raise
+        
+        # Move the arms to the home pose
+        self.driver.set_all_modes(trossen.Mode.position)
+        self.driver.set_all_positions(self.home_pose, 2.0, False)
+
+        # Allow to read and write - this must come BEFORE setting characteristics
+        self.is_connected = True
             
-        # If this is a LEADER model, set custom joint characteristics to prevent gripper oscillation
+        # Now that we're connected, apply custom joint characteristics if needed
         if self.model == "V0_LEADER":
             print("Setting custom joint characteristics for leader arm gripper...")
             try:
@@ -140,14 +147,6 @@ class TrossenArmDriver:
                 print(f"Warning: Failed to set custom joint characteristics: {e}")
                 traceback.print_exc()
                 # Continue with connection even if this fails
-        
-        # Move the arms to the home pose
-        self.driver.set_all_modes(trossen.Mode.position)
-        self.driver.set_all_positions(self.home_pose, 2.0, False)
-
-        # Allow to read and write
-        self.is_connected = True
-
 
     def reconnect(self):
         try:

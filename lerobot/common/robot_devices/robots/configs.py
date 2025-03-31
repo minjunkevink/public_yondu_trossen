@@ -715,7 +715,6 @@ class TrossenAISoloRobotConfig(ManipulatorRobotConfig):
                 # wxai
                 ip="192.168.1.2",
                 model="V0_LEADER",
-                mock=True,  # Use mock mode to avoid connection errors
             ),
         }
     )
@@ -725,17 +724,23 @@ class TrossenAISoloRobotConfig(ManipulatorRobotConfig):
             "main": TrossenArmDriverConfig(
                 ip="192.168.1.3",
                 model="V0_FOLLOWER",
-                mock=True,  # Use mock mode to avoid connection errors
             ),
         }
     )
 
     # Empty cameras dictionary to avoid camera-related errors
     cameras: dict[str, CameraConfig] = field(
-        default_factory=dict
+        default_factory= lambda: {
+             "cam_wrist": IntelRealSenseCameraConfig(
+                serial_number=230422273490,
+                fps=30,
+                width=640,
+                height=480,
+            ),
+        }
     )
 
-    mock: bool = True  # Set the entire robot to mock mode
+    mock: bool = False  # Set the entire robot to mock mode
 
 
 @RobotConfig.register_subclass("trossen_ai_mobile")
