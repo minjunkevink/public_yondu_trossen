@@ -230,6 +230,17 @@ class ManipulatorRobot:
             for arms in self.follower_arms:
                 self.follower_arms[arms].write("Reset", 1)
             time.sleep(2)
+            
+            # Apply custom joint characteristics to prevent gripper oscillation
+            for arms in self.leader_arms:
+                if hasattr(self.leader_arms[arms], 'set_custom_joint_characteristics'):
+                    try:
+                        print(f"Setting custom joint characteristics for {arms} leader arm gripper...")
+                        self.leader_arms[arms].set_custom_joint_characteristics()
+                    except Exception as e:
+                        print(f"Warning: Could not set custom joint characteristics: {e}")
+            
+            # Set arms to appropriate torque modes
             for arms in self.leader_arms:
                 self.leader_arms[arms].write("Torque_Enable", 0)
             for arms in self.follower_arms:

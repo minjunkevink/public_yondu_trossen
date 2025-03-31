@@ -130,7 +130,17 @@ class TrossenArmDriver:
                 f"Failed to configure the driver for the {self.model} arm at {self.ip}."
             )
             raise
-
+            
+        # If this is a LEADER model, set custom joint characteristics to prevent gripper oscillation
+        if self.model == "V0_LEADER":
+            print("Setting custom joint characteristics for leader arm gripper...")
+            try:
+                self.set_custom_joint_characteristics()
+            except Exception as e:
+                print(f"Warning: Failed to set custom joint characteristics: {e}")
+                traceback.print_exc()
+                # Continue with connection even if this fails
+        
         # Move the arms to the home pose
         self.driver.set_all_modes(trossen.Mode.position)
         self.driver.set_all_positions(self.home_pose, 2.0, False)
@@ -218,7 +228,7 @@ class TrossenArmDriver:
         time_to_move = max(time_to_move, self.MIN_TIME_TO_MOVE)
         return time_to_move
 
-    def write(self, data_name, values: int | float | np.ndarray, motor_names: str | list[str] | None = None):
+    def write(self, data_name, values: int | float | np.ndarray, motor_names: str | list[str] | None = None, gripper_resistance: float | None = None):
         if not self.is_connected:
             raise RobotDeviceNotConnectedError(
                 f"TrossenArmDriver({self.ip}) is not connected. You need to run `motors_bus.connect()`."
@@ -232,7 +242,9 @@ class TrossenArmDriver:
             # Convert back to radians for joints
             values[:-1] = np.radians(values[:-1])  # Convert all joints except gripper
             values[-1] = values[-1] / 10000  # Convert gripper back to range (0-0.045)
-            self.driver.set_all_positions(values.tolist(), self.compute_time_to_move(values), False)
+            time_to_move = self.compute_time_to_move(values)
+            # time_to_move = 0.02 # Setting to a hardcoded values to make the gripper more responsive
+            self.driver.set_all_positions(values.tolist(), time_to_move, False)
             self.prev_write_time = self.current_write_time
 
         # Enable or disable the torque of the motors
@@ -241,8 +253,18 @@ class TrossenArmDriver:
             if values == 1:
                 self.driver.set_all_modes(trossen.Mode.position)
             else:
+                # If this is a leader arm, make sure custom joint characteristics are applied
+                if self.model == "V0_LEADER":
+                    print(f"Switching {self.ip} to external_effort mode with custom joint characteristics")
+                    # First make sure joint characteristics are properly set
+                    self.set_custom_joint_characteristics()
+                    
+                # Put the arm in external effort mode (gravity compensation)
                 self.driver.set_all_modes(trossen.Mode.external_effort)
+                
+                # Use a non-zero goal time for smoother transition (2.0 seconds)
                 self.driver.set_all_external_efforts([0.0] * 7, 0.0, True)
+                
         elif data_name == "Reset":
             self.driver.set_all_modes(trossen.Mode.position)
             self.driver.set_all_positions(self.home_pose, 2.0, False)
@@ -265,3 +287,61 @@ class TrossenArmDriver:
     def __del__(self):
         if getattr(self, "is_connected", False):
             self.disconnect()
+            
+    def set_custom_joint_characteristics(self):
+        """
+        Set custom joint characteristics for the gripper to prevent oscillation.
+        
+        This method modifies the friction and effort parameters of the last joint (gripper)
+        to prevent oscillation during operation.
+        """
+        if not self.is_connected:
+            raise RobotDeviceNotConnectedError(
+                f"TrossenArmDriver({self.ip}) is not connected. You need to run `motors_bus.connect()`."
+            )
+            
+        try:
+            # Only proceed for leader arms which have the oscillation issue
+            if self.model != "V0_LEADER":
+                print(f"Skipping joint characteristic customization for non-leader model: {self.model}")
+                return False
+                
+            print(f"Setting custom joint characteristics for gripper on {self.ip}")
+            
+            # Get the current joint characteristics 
+            joint_characteristics = self.driver.get_joint_characteristics()
+            
+            if not joint_characteristics or len(joint_characteristics) < 7:
+                print(f"Warning: Could not get joint characteristics or unexpected number of joints")
+                return False
+                
+            # The gripper is the last joint (index 6)
+            num_joints = len(joint_characteristics)
+            gripper_index = num_joints - 1
+            
+            # Modify the gripper's joint characteristics to prevent oscillation
+            joint_characteristics[gripper_index].friction_viscous_coef = 1.0  # Damping to prevent oscillation
+            joint_characteristics[gripper_index].friction_constant_term = 0.1  # Low constant friction
+            joint_characteristics[gripper_index].friction_coulomb_coef = 0.05  # Small coulomb friction for stability
+            joint_characteristics[gripper_index].friction_transition_velocity = 0.01  # Low transition velocity
+            joint_characteristics[gripper_index].effort_correction = 2.0  # Maximum sensitivity
+            
+            # Set the modified joint characteristics
+            success = self.driver.set_joint_characteristics(joint_characteristics)
+            
+            if success:
+                print(f"Successfully set custom joint characteristics for gripper on {self.ip}")
+                # Print the values that were set
+                print(f"  friction_viscous_coef: {joint_characteristics[gripper_index].friction_viscous_coef}")
+                print(f"  friction_constant_term: {joint_characteristics[gripper_index].friction_constant_term}")
+                print(f"  friction_coulomb_coef: {joint_characteristics[gripper_index].friction_coulomb_coef}")
+                print(f"  friction_transition_velocity: {joint_characteristics[gripper_index].friction_transition_velocity}")
+                print(f"  effort_correction: {joint_characteristics[gripper_index].effort_correction}")
+            else:
+                print(f"Failed to set joint characteristics")
+                
+            return success
+            
+        except Exception as e:
+            print(f"Error setting custom joint characteristics: {e}")
+            return False

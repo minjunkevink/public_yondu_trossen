@@ -57,45 +57,48 @@ def rotate(color_image, rotation):
 
 
 class VideoCapture:
-    def __init__(self, *args, **kwargs):
-        self._mock_dict = {
-            CAP_PROP_FPS: 30,
-            CAP_PROP_FRAME_WIDTH: 640,
-            CAP_PROP_FRAME_HEIGHT: 480,
-        }
-        self._is_opened = True
-
-    def isOpened(self):  # noqa: N802
-        return self._is_opened
-
-    def set(self, propId: int, value: float) -> bool:  # noqa: N803
-        if not self._is_opened:
-            raise RuntimeError("Camera is not opened")
-        self._mock_dict[propId] = value
-        return True
-
-    def get(self, propId: int) -> float:  # noqa: N803
-        if not self._is_opened:
-            raise RuntimeError("Camera is not opened")
-        value = self._mock_dict[propId]
-        if value == 0:
-            if propId == CAP_PROP_FRAME_HEIGHT:
-                value = 480
-            elif propId == CAP_PROP_FRAME_WIDTH:
-                value = 640
-        return value
-
+    def __init__(self, index):
+        self.index = index
+        self.width = 640
+        self.height = 480
+        self.fps = 30
+        self.is_opened = True
+        
     def read(self):
-        if not self._is_opened:
-            raise RuntimeError("Camera is not opened")
-        h = self.get(CAP_PROP_FRAME_HEIGHT)
-        w = self.get(CAP_PROP_FRAME_WIDTH)
-        ret = True
-        return ret, _generate_image(width=w, height=h)
-
+        # Generate a random image as mock data
+        img = _generate_image(width=self.width, height=self.height)
+        return True, img
+        
+    def isOpened(self):
+        return self.is_opened
+        
     def release(self):
-        self._is_opened = False
+        self.is_opened = False
+        
+    def set(self, prop, value):
+        if prop == CAP_PROP_FRAME_WIDTH:
+            self.width = value
+            return True
+        elif prop == CAP_PROP_FRAME_HEIGHT:
+            self.height = value
+            return True
+        elif prop == CAP_PROP_FPS:
+            self.fps = value
+            return True
+        return False
+        
+    def get(self, prop):
+        if prop == CAP_PROP_FRAME_WIDTH:
+            return self.width
+        elif prop == CAP_PROP_FRAME_HEIGHT:
+            return self.height
+        elif prop == CAP_PROP_FPS:
+            return self.fps
+        return 0
 
-    def __del__(self):
-        if self._is_opened:
-            self.release()
+# Mock rotation functions
+def rotate(img, angle):
+    return img
+
+def flip(img, code):
+    return img

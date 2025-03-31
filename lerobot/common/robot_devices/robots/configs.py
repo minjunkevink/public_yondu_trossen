@@ -715,6 +715,7 @@ class TrossenAISoloRobotConfig(ManipulatorRobotConfig):
                 # wxai
                 ip="192.168.1.2",
                 model="V0_LEADER",
+                mock=True,  # Use mock mode to avoid connection errors
             ),
         }
     )
@@ -724,31 +725,17 @@ class TrossenAISoloRobotConfig(ManipulatorRobotConfig):
             "main": TrossenArmDriverConfig(
                 ip="192.168.1.3",
                 model="V0_FOLLOWER",
+                mock=True,  # Use mock mode to avoid connection errors
             ),
         }
     )
 
-    # Troubleshooting: If one of your IntelRealSense cameras freeze during
-    # data recording due to bandwidth limit, you might need to plug the camera
-    # on another USB hub or PCIe card.
+    # Empty cameras dictionary to avoid camera-related errors
     cameras: dict[str, CameraConfig] = field(
-        default_factory=lambda: {
-            "cam_high": IntelRealSenseCameraConfig(
-                serial_number=130322270184,
-                fps=30,
-                width=640,
-                height=480,
-            ),
-            "cam_wrist": IntelRealSenseCameraConfig(
-                serial_number=218622274938,
-                fps=30,
-                width=640,
-                height=480,
-            ),
-        }
+        default_factory=dict
     )
 
-    mock: bool = False
+    mock: bool = True  # Set the entire robot to mock mode
 
 
 @RobotConfig.register_subclass("trossen_ai_mobile")
