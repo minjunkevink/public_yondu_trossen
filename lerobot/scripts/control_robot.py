@@ -343,9 +343,9 @@ def record(
             restore_arm_positions(robot, saved_arm_positions)
 
         # Add a short delay before starting to record
-        time.sleep(1.0)
+        time.sleep(2.0)
 
-        log_say(f"Recording episode {dataset.num_episodes}", cfg.play_sounds)
+        log_say(f"\n\nRecording episode {dataset.num_episodes}", cfg.play_sounds)
         record_episode(
             robot=robot,
             dataset=dataset,
