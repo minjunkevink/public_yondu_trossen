@@ -339,8 +339,10 @@ def record(
         # For subsequent episodes (not the first one), restore the arm to the saved position
         if recorded_episodes > 0 and saved_arm_positions:
             # Use the utility function to restore arm positions and set to teleop mode
+            # Uses a hardcoded slow movement speed for safety
             restore_arm_positions(robot, saved_arm_positions)
 
+        # Add a short delay before starting to record
         time.sleep(1.0)
 
         log_say(f"Recording episode {dataset.num_episodes}", cfg.play_sounds)

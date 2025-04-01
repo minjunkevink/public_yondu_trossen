@@ -302,7 +302,8 @@ def reset_environment(robot, events, reset_time_s, fps):
 
 def restore_arm_positions(robot, saved_arm_positions):
     """
-    Restore the robot arms to previously saved positions and ensure they are in teleop mode afterward.
+    Restore both leader and follower robot arms to previously saved positions and ensure they are in teleop mode afterward.
+    Uses a slow movement speed for safety and smoothness.
     
     Args:
         robot: The robot instance that contains the arms to be positioned
@@ -311,42 +312,100 @@ def restore_arm_positions(robot, saved_arm_positions):
     Returns:
         bool: True if successful, False if there was an error
     """
-    if not saved_arm_positions or not hasattr(robot, "leader_arms") or not robot.leader_arms:
+    if not saved_arm_positions or (not hasattr(robot, "leader_arms") and not hasattr(robot, "follower_arms")):
         return False
         
-    print("Restoring arms to the saved position...")
+    # Hardcoded slow movement time (10 seconds)
+    SLOW_MOVE_TIME = 10.0
+    
+    print(f"Restoring all arms to the saved position with slow movement ({SLOW_MOVE_TIME}s)...")
     
     try:
-        # First enable position mode for precise positioning (torque=1 sets position mode)
-        for arm_name in robot.leader_arms:
-            if arm_name in saved_arm_positions:
-                leader_arm = robot.leader_arms[arm_name]
-                if hasattr(leader_arm, "write"):
-                    # Enable torque to ensure position control (Torque_Enable=1 sets position mode)
-                    leader_arm.write("Torque_Enable", 1)
+        # First enable position mode for precise positioning for both leader and follower arms
+        
+        # Handle leader arms
+        if hasattr(robot, "leader_arms") and robot.leader_arms:
+            for arm_name in robot.leader_arms:
+                if arm_name in saved_arm_positions:
+                    leader_arm = robot.leader_arms[arm_name]
+                    if hasattr(leader_arm, "write"):
+                        # Enable torque to ensure position control (Torque_Enable=1 sets position mode)
+                        leader_arm.write("Torque_Enable", 1)
+                        print(f"Enabled position mode for leader arm: {arm_name}")
+        
+        # Handle follower arms
+        if hasattr(robot, "follower_arms") and robot.follower_arms:
+            for arm_name in robot.follower_arms:
+                if arm_name in saved_arm_positions:
+                    follower_arm = robot.follower_arms[arm_name]
+                    if hasattr(follower_arm, "write"):
+                        # Follower arms should already be in position mode, but ensure it
+                        follower_arm.write("Torque_Enable", 1)
+                        print(f"Enabled position mode for follower arm: {arm_name}")
         
         # Now move arms to the saved positions
-        for arm_name in robot.leader_arms:
-            if arm_name in saved_arm_positions:
-                leader_arm = robot.leader_arms[arm_name]
-                if hasattr(leader_arm, "write"):
-                    # Set the arm back to the position saved after warmup
-                    leader_arm.write("Goal_Position", saved_arm_positions[arm_name])
-                    print(f"Restored {arm_name} to saved position")
+        
+        # Move leader arms
+        if hasattr(robot, "leader_arms") and robot.leader_arms:
+            for arm_name in robot.leader_arms:
+                if arm_name in saved_arm_positions:
+                    leader_arm = robot.leader_arms[arm_name]
+                    if hasattr(leader_arm, "write"):
+                        # Set the arm back to the position saved after warmup
+                        if hasattr(leader_arm, "driver") and hasattr(leader_arm.driver, "set_all_positions"):
+                            # If the driver has direct position control with time parameter
+                            try:
+                                # Use the driver to set positions with a long move time
+                                leader_arm.driver.set_all_positions(saved_arm_positions[arm_name], SLOW_MOVE_TIME, wait=False)
+                                print(f"Set leader arm {arm_name} to move slowly over {SLOW_MOVE_TIME} seconds")
+                            except Exception as e:
+                                # Fall back to standard method if direct control fails
+                                print(f"Could not use direct position control for leader arm: {e}. Using standard method.")
+                                leader_arm.write("Goal_Position", saved_arm_positions[arm_name])
+                        else:
+                            # Standard way to set position
+                            leader_arm.write("Goal_Position", saved_arm_positions[arm_name])
+                        
+                        print(f"Restored leader arm {arm_name} to saved position")
+        
+        # Move follower arms
+        if hasattr(robot, "follower_arms") and robot.follower_arms:
+            for arm_name in robot.follower_arms:
+                if arm_name in saved_arm_positions:
+                    follower_arm = robot.follower_arms[arm_name]
+                    if hasattr(follower_arm, "write"):
+                        # Set the arm back to the position saved after warmup
+                        if hasattr(follower_arm, "driver") and hasattr(follower_arm.driver, "set_all_positions"):
+                            # If the driver has direct position control with time parameter
+                            try:
+                                # Use the driver to set positions with a long move time
+                                follower_arm.driver.set_all_positions(saved_arm_positions[arm_name], SLOW_MOVE_TIME, wait=False)
+                                print(f"Set follower arm {arm_name} to move slowly over {SLOW_MOVE_TIME} seconds")
+                            except Exception as e:
+                                # Fall back to standard method if direct control fails
+                                print(f"Could not use direct position control for follower arm: {e}. Using standard method.")
+                                follower_arm.write("Goal_Position", saved_arm_positions[arm_name])
+                        else:
+                            # Standard way to set position
+                            follower_arm.write("Goal_Position", saved_arm_positions[arm_name])
+                        
+                        print(f"Restored follower arm {arm_name} to saved position")
         
         # Wait for arms to reach position
-        time.sleep(3.0)
+        print(f"Waiting {SLOW_MOVE_TIME} seconds for all arms to reach their positions...")
+        time.sleep(SLOW_MOVE_TIME)
         
-        # Switch back to teleop mode (external effort control) for the leader arms
-        # In the TrossenArmDriver, setting Torque_Enable=0 activates external_effort mode
-        print("Switching back to teleoperation mode (external effort)...")
-        
-        for arm_name in robot.leader_arms:
-            leader_arm = robot.leader_arms[arm_name]
-            if hasattr(leader_arm, "write"):
-                # Disable torque to enable external effort mode
-                leader_arm.write("Torque_Enable", 0)
-                print(f"Set {arm_name} back to external effort mode")
+        # Switch back to teleop mode (external effort control) for ONLY the leader arms
+        # Follower arms should remain in position mode
+        if hasattr(robot, "leader_arms") and robot.leader_arms:
+            print("Switching leader arms back to teleoperation mode (external effort)...")
+            
+            for arm_name in robot.leader_arms:
+                leader_arm = robot.leader_arms[arm_name]
+                if hasattr(leader_arm, "write"):
+                    # Disable torque to enable external effort mode
+                    leader_arm.write("Torque_Enable", 0)
+                    print(f"Set leader arm {arm_name} back to external effort mode")
         
         # Give the system time to stabilize in external effort mode
         time.sleep(0.5)
@@ -354,12 +413,13 @@ def restore_arm_positions(robot, saved_arm_positions):
         
     except Exception as e:
         print(f"Warning: Could not manage arm positions/modes: {e}")
-        # Try to restore teleop mode in case of failure by disabling torque
+        # Try to restore teleop mode in case of failure by disabling torque (only for leader arms)
         try:
-            for arm_name in robot.leader_arms:
-                leader_arm = robot.leader_arms[arm_name]
-                if hasattr(leader_arm, "write"):
-                    leader_arm.write("Torque_Enable", 0)
+            if hasattr(robot, "leader_arms") and robot.leader_arms:
+                for arm_name in robot.leader_arms:
+                    leader_arm = robot.leader_arms[arm_name]
+                    if hasattr(leader_arm, "write"):
+                        leader_arm.write("Torque_Enable", 0)
         except Exception as ex:
             print(f"Failed to restore external effort mode after error: {ex}")
         return False
@@ -367,7 +427,7 @@ def restore_arm_positions(robot, saved_arm_positions):
 
 def save_arm_positions(robot):
     """
-    Save the current positions of robot arms.
+    Save the current positions of both leader and follower robot arms.
     
     Args:
         robot: The robot instance that contains the arms whose positions will be saved
@@ -378,13 +438,23 @@ def save_arm_positions(robot):
     saved_positions = {}
     
     try:
+        # Save leader arm positions
         if hasattr(robot, "leader_arms") and robot.leader_arms:
             for arm_name in robot.leader_arms:
                 leader_arm = robot.leader_arms[arm_name]
                 if hasattr(leader_arm, "read"):
                     # Read the current position
                     saved_positions[arm_name] = leader_arm.read("Present_Position")
-                    print(f"Saved {arm_name} position: {saved_positions[arm_name]}")
+                    print(f"Saved leader arm {arm_name} position: {saved_positions[arm_name]}")
+        
+        # Save follower arm positions
+        if hasattr(robot, "follower_arms") and robot.follower_arms:
+            for arm_name in robot.follower_arms:
+                follower_arm = robot.follower_arms[arm_name]
+                if hasattr(follower_arm, "read"):
+                    # Read the current position
+                    saved_positions[arm_name] = follower_arm.read("Present_Position")
+                    print(f"Saved follower arm {arm_name} position: {saved_positions[arm_name]}")
                     
         return saved_positions
     except Exception as e:
