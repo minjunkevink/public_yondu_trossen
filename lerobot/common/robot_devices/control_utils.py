@@ -316,7 +316,7 @@ def restore_arm_positions(robot, saved_arm_positions):
         return False
         
     # Hardcoded slow movement time (10 seconds)
-    SLOW_MOVE_TIME = 10.0
+    SLOW_MOVE_TIME = 3.0
     
     print(f"Restoring all arms to the saved position with slow movement ({SLOW_MOVE_TIME}s)...")
     
@@ -356,7 +356,7 @@ def restore_arm_positions(robot, saved_arm_positions):
                             # If the driver has direct position control with time parameter
                             try:
                                 # Use the driver to set positions with a long move time
-                                leader_arm.driver.set_all_positions(saved_arm_positions[arm_name], SLOW_MOVE_TIME, wait=False)
+                                leader_arm.driver.set_all_positions(saved_arm_positions[arm_name].tolist(), SLOW_MOVE_TIME, wait=False)
                                 print(f"Set leader arm {arm_name} to move slowly over {SLOW_MOVE_TIME} seconds")
                             except Exception as e:
                                 # Fall back to standard method if direct control fails
@@ -379,7 +379,7 @@ def restore_arm_positions(robot, saved_arm_positions):
                             # If the driver has direct position control with time parameter
                             try:
                                 # Use the driver to set positions with a long move time
-                                follower_arm.driver.set_all_positions(saved_arm_positions[arm_name], SLOW_MOVE_TIME, wait=False)
+                                follower_arm.driver.set_all_positions(saved_arm_positions[arm_name].tolist(), SLOW_MOVE_TIME, wait=False)
                                 print(f"Set follower arm {arm_name} to move slowly over {SLOW_MOVE_TIME} seconds")
                             except Exception as e:
                                 # Fall back to standard method if direct control fails
