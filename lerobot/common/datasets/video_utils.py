@@ -259,6 +259,23 @@ def encode_video_frames(
     video_path = Path(video_path)
     video_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Check if the specified codec is available, fall back to libx264 if not
+    try:
+        codec_check = subprocess.run(
+            ["ffmpeg", "-encoders"], 
+            check=True, 
+            capture_output=True, 
+            text=True
+        )
+        if vcodec not in codec_check.stdout:
+            logging.warning(
+                f"Video codec '{vcodec}' not available. Falling back to 'libx264'."
+            )
+            vcodec = "libx264"
+    except (subprocess.SubprocessError, FileNotFoundError):
+        # If we can't check codecs, just try with libx264
+        vcodec = "libx264"
+
     ffmpeg_args = OrderedDict(
         [
             ("-f", "image2"),
