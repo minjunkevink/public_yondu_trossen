@@ -352,19 +352,7 @@ def restore_arm_positions(robot, saved_arm_positions):
                     leader_arm = robot.leader_arms[arm_name]
                     if hasattr(leader_arm, "write"):
                         # Set the arm back to the position saved after warmup
-                        if hasattr(leader_arm, "driver") and hasattr(leader_arm.driver, "set_all_positions"):
-                            # If the driver has direct position control with time parameter
-                            try:
-                                # Use the driver to set positions with a long move time
-                                # leader_arm.driver.set_all_positions(saved_arm_positions[arm_name].tolist(), SLOW_MOVE_TIME)
-                                print(f"Set leader arm {arm_name} to move slowly over {SLOW_MOVE_TIME} seconds")
-                            except Exception as e:
-                                # Fall back to standard method if direct control fails
-                                print(f"Could not use direct position control for leader arm: {e}. Using standard method.")
-                                leader_arm.write("Goal_Position", saved_arm_positions[arm_name])
-                        else:
-                            # Standard way to set position
-                            leader_arm.write("Goal_Position", saved_arm_positions[arm_name])
+                        leader_arm.write("Goal_Position", saved_arm_positions[arm_name])
                         
                         print(f"Restored leader arm {arm_name} to saved position")
         
@@ -375,19 +363,7 @@ def restore_arm_positions(robot, saved_arm_positions):
                     follower_arm = robot.follower_arms[arm_name]
                     if hasattr(follower_arm, "write"):
                         # Set the arm back to the position saved after warmup
-                        if hasattr(follower_arm, "driver") and hasattr(follower_arm.driver, "set_all_positions"):
-                            # If the driver has direct position control with time parameter
-                            try:
-                                # Use the driver to set positions with a long move time
-                                # follower_arm.driver.set_all_positions(saved_arm_positions[arm_name].tolist(), SLOW_MOVE_TIME)
-                                print(f"Set follower arm {arm_name} to move slowly over {SLOW_MOVE_TIME} seconds")
-                            except Exception as e:
-                                # Fall back to standard method if direct control fails
-                                print(f"Could not use direct position control for follower arm: {e}. Using standard method.")
-                                follower_arm.write("Goal_Position", saved_arm_positions[arm_name])
-                        else:
-                            # Standard way to set position
-                            follower_arm.write("Goal_Position", saved_arm_positions[arm_name])
+                        follower_arm.write("Goal_Position", saved_arm_positions[arm_name])
                         
                         print(f"Restored follower arm {arm_name} to saved position")
         
