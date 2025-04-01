@@ -236,6 +236,49 @@ def teleoperate(robot: Robot, cfg: TeleoperateControlConfig):
     )
 
 
+# Add the input module for waiting for user input
+import builtins
+from threading import Thread, Event
+import queue
+
+# Add a new function for user prompt between episodes
+def wait_for_user_continue():
+    """
+    Wait for the user to press Enter to continue to the next episode.
+    Returns immediately if the input is interrupted.
+    """
+    print("\n>>> Press ENTER to start the next episode... <<<")
+    try:
+        # Use a thread and event to make input interruptible
+        user_input_queue = queue.Queue()
+        stop_event = Event()
+        
+        def input_thread_func():
+            try:
+                user_input = builtins.input()
+                if not stop_event.is_set():
+                    user_input_queue.put(user_input)
+            except (KeyboardInterrupt, EOFError):
+                pass
+        
+        input_thread = Thread(target=input_thread_func)
+        input_thread.daemon = True
+        input_thread.start()
+        
+        # Wait for the thread to complete or timeout
+        input_thread.join(timeout=3600)  # Timeout after 1 hour (effectively no timeout)
+        
+        # Check if we have input
+        try:
+            _ = user_input_queue.get(block=False)
+            print("Starting next episode...")
+            return True
+        except queue.Empty:
+            return False
+    except (KeyboardInterrupt, EOFError):
+        print("\nInput interrupted.")
+        return False
+
 @safe_disconnect
 def record(
     robot: Robot,
@@ -282,8 +325,11 @@ def record(
     log_say("Warmup record", cfg.play_sounds)
     warmup_record(robot, events, enable_teleoperation, cfg.warmup_time_s, cfg.display_cameras, cfg.fps)
 
-    if has_method(robot, "teleop_safety_stop"):
-        robot.teleop_safety_stop()
+    # IMPORTANT: We're removing the safety stop here to preserve the position you set during warmup
+    # This allows you to position the arm during warmup and keep that position for recording
+    # if has_method(robot, "teleop_safety_stop"):
+    #     robot.teleop_safety_stop()
+    print("Preserving the arm position you set during warmup period...")
 
     recorded_episodes = 0
     while True:
@@ -302,15 +348,19 @@ def record(
             single_task=cfg.single_task,
         )
 
-        # Execute a few seconds without recording to give time to manually reset the environment
-        # Current code logic doesn't allow to teleoperate during this time.
-        # TODO(rcadene): add an option to enable teleoperation during reset
         # Skip reset for the last episode to be recorded
         if not events["stop_recording"] and (
             (recorded_episodes < cfg.num_episodes - 1) or events["rerecord_episode"]
         ):
             log_say("Reset the environment", cfg.play_sounds)
-            reset_environment(robot, events, cfg.reset_time_s, cfg.fps)
+            # Instead of using a fixed reset time, wait for user input
+            if has_method(robot, "teleop_safety_stop"):
+                robot.teleop_safety_stop()
+            
+            # Allow the user to manually reset the environment, then press Enter to continue
+            if not wait_for_user_continue():
+                # If input was interrupted, treat as stop_recording
+                events["stop_recording"] = True
 
         if events["rerecord_episode"]:
             log_say("Re-record episode", cfg.play_sounds)
