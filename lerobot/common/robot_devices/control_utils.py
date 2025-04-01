@@ -335,7 +335,7 @@ def restore_arm_positions(robot, saved_arm_positions):
                     print(f"Restored {arm_name} to saved position")
         
         # Wait for arms to reach position
-        time.sleep(2.0)
+        time.sleep(3.0)
         
         # Switch back to teleop mode (external effort control) for the leader arms
         # In the TrossenArmDriver, setting Torque_Enable=0 activates external_effort mode

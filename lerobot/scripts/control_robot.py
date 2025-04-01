@@ -336,6 +336,13 @@ def record(
         if recorded_episodes >= cfg.num_episodes:
             break
 
+        # For subsequent episodes (not the first one), restore the arm to the saved position
+        if recorded_episodes > 0 and saved_arm_positions:
+            # Use the utility function to restore arm positions and set to teleop mode
+            restore_arm_positions(robot, saved_arm_positions)
+
+        time.sleep(1.0)
+
         log_say(f"Recording episode {dataset.num_episodes}", cfg.play_sounds)
         record_episode(
             robot=robot,
@@ -353,11 +360,6 @@ def record(
             (recorded_episodes < cfg.num_episodes - 1) or events["rerecord_episode"]
         ):
             log_say("Reset the environment", cfg.play_sounds)
-            
-            # For subsequent episodes (not the first one), restore the arm to the saved position
-            if recorded_episodes > 0 and saved_arm_positions:
-                # Use the utility function to restore arm positions and set to teleop mode
-                restore_arm_positions(robot, saved_arm_positions)
             # Instead of using a fixed reset time, wait for user input
             
             # Allow the user to manually reset the environment, then press Enter to continue
