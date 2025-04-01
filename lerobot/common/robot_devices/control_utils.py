@@ -300,6 +300,98 @@ def reset_environment(robot, events, reset_time_s, fps):
         )
 
 
+def restore_arm_positions(robot, saved_arm_positions):
+    """
+    Restore the robot arms to previously saved positions and ensure they are in teleop mode afterward.
+    
+    Args:
+        robot: The robot instance that contains the arms to be positioned
+        saved_arm_positions: Dictionary mapping arm names to their saved positions
+        
+    Returns:
+        bool: True if successful, False if there was an error
+    """
+    if not saved_arm_positions or not hasattr(robot, "leader_arms") or not robot.leader_arms:
+        return False
+        
+    print("Restoring arms to the saved position...")
+    
+    try:
+        # First enable position mode for precise positioning (torque=1 sets position mode)
+        for arm_name in robot.leader_arms:
+            if arm_name in saved_arm_positions:
+                leader_arm = robot.leader_arms[arm_name]
+                if hasattr(leader_arm, "write"):
+                    # Enable torque to ensure position control (Torque_Enable=1 sets position mode)
+                    leader_arm.write("Torque_Enable", 1)
+        
+        # Now move arms to the saved positions
+        for arm_name in robot.leader_arms:
+            if arm_name in saved_arm_positions:
+                leader_arm = robot.leader_arms[arm_name]
+                if hasattr(leader_arm, "write"):
+                    # Set the arm back to the position saved after warmup
+                    leader_arm.write("Goal_Position", saved_arm_positions[arm_name])
+                    print(f"Restored {arm_name} to saved position")
+        
+        # Wait for arms to reach position
+        time.sleep(2.0)
+        
+        # Switch back to teleop mode (external effort control) for the leader arms
+        # In the TrossenArmDriver, setting Torque_Enable=0 activates external_effort mode
+        print("Switching back to teleoperation mode (external effort)...")
+        
+        for arm_name in robot.leader_arms:
+            leader_arm = robot.leader_arms[arm_name]
+            if hasattr(leader_arm, "write"):
+                # Disable torque to enable external effort mode
+                leader_arm.write("Torque_Enable", 0)
+                print(f"Set {arm_name} back to external effort mode")
+        
+        # Give the system time to stabilize in external effort mode
+        time.sleep(0.5)
+        return True
+        
+    except Exception as e:
+        print(f"Warning: Could not manage arm positions/modes: {e}")
+        # Try to restore teleop mode in case of failure by disabling torque
+        try:
+            for arm_name in robot.leader_arms:
+                leader_arm = robot.leader_arms[arm_name]
+                if hasattr(leader_arm, "write"):
+                    leader_arm.write("Torque_Enable", 0)
+        except Exception as ex:
+            print(f"Failed to restore external effort mode after error: {ex}")
+        return False
+
+
+def save_arm_positions(robot):
+    """
+    Save the current positions of robot arms.
+    
+    Args:
+        robot: The robot instance that contains the arms whose positions will be saved
+        
+    Returns:
+        dict: A dictionary mapping arm names to their current positions, or an empty dict if there was an error
+    """
+    saved_positions = {}
+    
+    try:
+        if hasattr(robot, "leader_arms") and robot.leader_arms:
+            for arm_name in robot.leader_arms:
+                leader_arm = robot.leader_arms[arm_name]
+                if hasattr(leader_arm, "read"):
+                    # Read the current position
+                    saved_positions[arm_name] = leader_arm.read("Present_Position")
+                    print(f"Saved {arm_name} position: {saved_positions[arm_name]}")
+                    
+        return saved_positions
+    except Exception as e:
+        print(f"Warning: Could not save arm positions: {e}")
+        return {}  # Return empty dict if there was an error
+
+
 def stop_recording(robot, listener, display_cameras):
     robot.disconnect()
 

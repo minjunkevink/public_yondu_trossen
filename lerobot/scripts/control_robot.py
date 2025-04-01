@@ -156,6 +156,8 @@ from lerobot.common.robot_devices.control_utils import (
     log_control_info,
     record_episode,
     reset_environment,
+    restore_arm_positions,
+    save_arm_positions,
     sanity_check_dataset_name,
     sanity_check_dataset_robot_compatibility,
     stop_recording,
@@ -326,19 +328,7 @@ def record(
     warmup_record(robot, events, enable_teleoperation, cfg.warmup_time_s, cfg.display_cameras, cfg.fps)
 
     # Store the arm positions after warmup - these will be our start positions for each episode
-    saved_arm_positions = {}
-    try:
-        if hasattr(robot, "leader_arms") and robot.leader_arms:
-            for arm_name in robot.leader_arms:
-                leader_arm = robot.leader_arms[arm_name]
-                if hasattr(leader_arm, "read"):
-                    # Read the current position that the user set during warmup
-                    saved_arm_positions[arm_name] = leader_arm.read("Present_Position")
-                    print(f"Saved {arm_name} start position: {saved_arm_positions[arm_name]}")
-    except Exception as e:
-        print(f"Warning: Could not save arm positions after warmup: {e}")
-        saved_arm_positions = {}  # Reset to empty if there was an error
-
+    saved_arm_positions = save_arm_positions(robot)
     print("Preserving the arm position you set during warmup period...")
 
     recorded_episodes = 0
@@ -348,30 +338,8 @@ def record(
 
         # For subsequent episodes (not the first one), restore the arm to the saved position
         if recorded_episodes > 0 and saved_arm_positions:
-            print("Restoring arms to the position you set during warmup...")
-            
-            try:
-                # First enable position mode for precise positioning
-                for arm_name in robot.leader_arms:
-                    if arm_name in saved_arm_positions:
-                        leader_arm = robot.leader_arms[arm_name]
-                        if hasattr(leader_arm, "write"):
-                            # Enable torque to ensure position control
-                            leader_arm.write("Torque_Enable", 1)
-                
-                # Now move arms to the saved positions
-                for arm_name in robot.leader_arms:
-                    if arm_name in saved_arm_positions:
-                        leader_arm = robot.leader_arms[arm_name]
-                        if hasattr(leader_arm, "write"):
-                            # Set the arm back to the position saved after warmup
-                            leader_arm.write("Goal_Position", saved_arm_positions[arm_name])
-                            print(f"Restored {arm_name} to start position")
-                
-                # Wait for arms to reach position
-                time.sleep(2.0)
-            except Exception as e:
-                print(f"Warning: Could not restore arm positions: {e}")
+            # Use the utility function to restore arm positions and set to teleop mode
+            restore_arm_positions(robot, saved_arm_positions)
 
         log_say(f"Recording episode {dataset.num_episodes}", cfg.play_sounds)
         record_episode(
