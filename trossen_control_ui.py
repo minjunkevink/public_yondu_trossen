@@ -5,9 +5,20 @@ import subprocess
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QSpinBox, QPushButton, QTextEdit, QFormLayout,
-    QDoubleSpinBox, QGroupBox
+    QDoubleSpinBox, QGroupBox, QPlainTextEdit
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
+
+class FocusLineEdit(QLineEdit):
+    """Custom LineEdit that explicitly handles focus and input methods"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set input focus policies explicitly
+        self.setFocusPolicy(Qt.StrongFocus)
+        # Enable all input methods
+        self.setAttribute(Qt.WA_InputMethodEnabled, True)
+        # Set as clickable
+        self.setCursor(Qt.IBeamCursor)
 
 class TrossenControlUI(QMainWindow):
     def __init__(self):
@@ -33,7 +44,7 @@ class TrossenControlUI(QMainWindow):
         user_layout = QFormLayout()
         
         # HF_USER input - use environment variable if available
-        self.hf_user_input = QLineEdit(self.hf_user)
+        self.hf_user_input = FocusLineEdit(self.hf_user)
         self.hf_user_input.setPlaceholderText("Your HuggingFace username")
         self.hf_user_input.textChanged.connect(self.update_hf_user)
         user_layout.addRow(QLabel("HuggingFace Username:"), self.hf_user_input)
@@ -48,15 +59,15 @@ class TrossenControlUI(QMainWindow):
         main_layout.addWidget(user_group)
         
         # Repo ID (without HF_USER)
-        self.repo_name_input = QLineEdit("trossen_ai_solo_test")
+        self.repo_name_input = FocusLineEdit("trossen_ai_solo_test")
         form_layout.addRow(QLabel(f"Repo Name (will be {self.hf_user}/...)"), self.repo_name_input)
         
         # Task description
-        self.task_input = QLineEdit("Test recording episode using Trossen AI Solo.")
+        self.task_input = FocusLineEdit("Test recording episode using Trossen AI Solo.")
         form_layout.addRow(QLabel("Task Description:"), self.task_input)
         
         # Tags as comma-separated values
-        self.tags_input = QLineEdit("tutorial")
+        self.tags_input = FocusLineEdit("tutorial")
         form_layout.addRow(QLabel("Tags (comma-separated):"), self.tags_input)
         
         # Episode time
@@ -64,6 +75,7 @@ class TrossenControlUI(QMainWindow):
         self.episode_time_input.setRange(1, 60)
         self.episode_time_input.setValue(10)
         self.episode_time_input.setSuffix(" seconds")
+        self.episode_time_input.setFocusPolicy(Qt.StrongFocus)
         form_layout.addRow(QLabel("Episode Time:"), self.episode_time_input)
         
         # Reset time
@@ -71,17 +83,41 @@ class TrossenControlUI(QMainWindow):
         self.reset_time_input.setRange(1, 30)
         self.reset_time_input.setValue(5)
         self.reset_time_input.setSuffix(" seconds")
+        self.reset_time_input.setFocusPolicy(Qt.StrongFocus)
         form_layout.addRow(QLabel("Reset Time:"), self.reset_time_input)
         
         # Number of episodes
         self.num_episodes_input = QSpinBox()
         self.num_episodes_input.setRange(1, 100)
         self.num_episodes_input.setValue(5)
+        self.num_episodes_input.setFocusPolicy(Qt.StrongFocus)
         form_layout.addRow(QLabel("Number of Episodes:"), self.num_episodes_input)
         
         # Finish form group
         form_group.setLayout(form_layout)
         main_layout.addWidget(form_group)
+        
+        # Alternative Input Methods section for systems with input issues
+        alt_input_group = QGroupBox("Alternative Input Method")
+        alt_input_layout = QVBoxLayout()
+        
+        alt_info_label = QLabel("If normal input fields don't work, use this alternative method:")
+        alt_info_label.setStyleSheet("color: blue")
+        alt_input_layout.addWidget(alt_info_label)
+        
+        alt_input_layout.addWidget(QLabel("Enter all parameters in format: repo_name,task,tags,episode_time,reset_time,num_episodes"))
+        alt_input_layout.addWidget(QLabel("Example: test_repo,Pick up objects,tutorial|robotics,10,5,3"))
+        
+        self.alt_input_field = QPlainTextEdit()
+        self.alt_input_field.setPlaceholderText("Enter parameters separated by commas")
+        alt_input_layout.addWidget(self.alt_input_field)
+        
+        self.apply_alt_input_btn = QPushButton("Apply Parameters")
+        self.apply_alt_input_btn.clicked.connect(self.apply_alt_input)
+        alt_input_layout.addWidget(self.apply_alt_input_btn)
+        
+        alt_input_group.setLayout(alt_input_layout)
+        main_layout.addWidget(alt_input_group)
         
         # Create group for command preview and execution
         command_group = QGroupBox("Command")
@@ -118,8 +154,62 @@ class TrossenControlUI(QMainWindow):
         self.reset_time_input.valueChanged.connect(self.update_command)
         self.num_episodes_input.valueChanged.connect(self.update_command)
         
+        # Give focus to first field after a short delay
+        QTimer.singleShot(100, lambda: self.hf_user_input.setFocus())
+        
         # Initial command preview
         self.update_command()
+    
+    def apply_alt_input(self):
+        """Parse and apply input from the alternative text field"""
+        try:
+            # Get the text and split by commas
+            input_text = self.alt_input_field.toPlainText().strip()
+            if not input_text:
+                self.output_log.setText("Error: Alternative input field is empty")
+                return
+                
+            parts = input_text.split(',')
+            
+            # Need at least 6 parts
+            if len(parts) < 6:
+                self.output_log.setText(f"Error: Not enough parameters (got {len(parts)}, need 6)")
+                return
+                
+            # Apply the values to the regular fields
+            self.repo_name_input.setText(parts[0].strip())
+            self.task_input.setText(parts[1].strip())
+            
+            # Tags might contain multiple values separated by |
+            tags = parts[2].strip().replace('|', ',')
+            self.tags_input.setText(tags)
+            
+            # Try to convert numeric values
+            try:
+                episode_time = float(parts[3].strip())
+                self.episode_time_input.setValue(episode_time)
+            except ValueError:
+                self.output_log.setText("Error: Episode time must be a number")
+                return
+                
+            try:
+                reset_time = float(parts[4].strip())
+                self.reset_time_input.setValue(reset_time)
+            except ValueError:
+                self.output_log.setText("Error: Reset time must be a number")
+                return
+                
+            try:
+                num_episodes = int(parts[5].strip())
+                self.num_episodes_input.setValue(num_episodes)
+            except ValueError:
+                self.output_log.setText("Error: Number of episodes must be an integer")
+                return
+                
+            self.output_log.setText("Successfully applied parameters from alternative input field")
+                
+        except Exception as e:
+            self.output_log.setText(f"Error parsing alternative input: {str(e)}")
     
     def update_hf_user(self):
         """Update the HF_USER variable when the input changes"""
@@ -203,6 +293,10 @@ class TrossenControlUI(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
+    # Force to use a specific input method
+    if sys.platform.startswith('linux'):
+        os.environ['QT_IM_MODULE'] = 'xim'  # Try this alternative input method on Linux
+    
     # Check if HF_USER is set
     hf_user = os.environ.get('HF_USER')
     if not hf_user:
@@ -216,6 +310,7 @@ if __name__ == "__main__":
     print("\nStarting Trossen AI Solo Control UI...")
     print("This UI allows you to easily configure and run the control_robot.py script")
     print("with custom parameters for data collection.")
+    print("\nTIP: If input fields don't work properly, use the Alternative Input Method section.")
     
     window = TrossenControlUI()
     window.show()
