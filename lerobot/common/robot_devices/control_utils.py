@@ -230,6 +230,7 @@ def control_loop(
         events = {"exit_early": False}
 
     if control_time_s is None:
+        print("Control time is None, setting to infinity")
         control_time_s = float("inf")
 
     if teleoperate and policy is not None:

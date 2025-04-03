@@ -31,13 +31,8 @@ from PIL import Image
 
 
 def get_safe_default_codec():
-    if importlib.util.find_spec("torchcodec"):
-        return "torchcodec"
-    else:
-        logging.warning(
-            "'torchcodec' is not available in your platform, falling back to 'pyav' as a default decoder"
-        )
-        return "pyav"
+    # Always return pyav to avoid compatibility issues
+    return "pyav"
 
 
 def decode_video_frames(
@@ -60,14 +55,8 @@ def decode_video_frames(
 
     Currently supports torchcodec on cpu and pyav.
     """
-    if backend is None:
-        backend = get_safe_default_codec()
-    if backend == "torchcodec":
-        return decode_video_frames_torchcodec(video_path, timestamps, tolerance_s)
-    elif backend in ["pyav", "video_reader"]:
-        return decode_video_frames_torchvision(video_path, timestamps, tolerance_s, backend)
-    else:
-        raise ValueError(f"Unsupported video backend: {backend}")
+    # Always use pyav as the backend for compatibility
+    return decode_video_frames_torchvision(video_path, timestamps, tolerance_s, "pyav")
 
 
 def decode_video_frames_torchvision(
