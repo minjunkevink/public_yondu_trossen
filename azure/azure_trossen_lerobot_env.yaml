@@ -1,0 +1,66 @@
+name: trossen_lerobot
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip=25.0
+  - numpy
+  - cmake>=3.29.0
+  - pip:
+      # Core dependencies from pyproject.toml
+      - cmake>=3.29.0.1
+      - datasets>=2.19.0
+      - deepdiff>=7.0.1
+      - diffusers>=0.27.2
+      - draccus>=0.10.0
+      - einops>=0.8.0
+      - flask>=3.0.3
+      - gdown>=5.1.0
+      - gymnasium==0.29.1
+      - h5py>=3.10.0
+      - huggingface-hub[hf-transfer,cli]>=0.27.1
+      - imageio[ffmpeg]>=2.34.0
+      - jsonlines>=4.0.0
+      - numba>=0.59.0
+      - omegaconf>=2.3.0
+      - opencv-python>=4.9.0
+      - packaging>=24.2
+      - av>=12.0.5
+      - pymunk>=6.6.0
+      - pynput>=1.7.7
+      - pyzmq>=26.2.1
+      - rerun-sdk>=0.21.0
+      - termcolor>=2.4.0
+      - torch>=2.2.1
+      - torchvision==0.20.1
+      - wandb>=0.16.3
+      - zarr>=2.17.0
+      
+      # Azure ML specific dependencies
+      - azure-ai-ml
+      - azure-identity
+      
+      # Optional dependencies that may be needed
+      - transformers>=4.48.0  # from pi0 optional dependency
+      - pytest>=8.1.0  # for testing
+      - pyrealsense2>=2.55.1.6486; platform_system != "Darwin"  # for trossen_ai
+      
+      # Required dependencies from your original conda env
+      - deprecated>=1.2.18
+      - platformdirs>=4.3.7
+      - psutil>=7.0.0
+      - wrapt>=1.17.2
+      
+      # Additional dependencies for development
+      - pre-commit>=3.7.0
+      - debugpy>=1.8.1
+      - poetry-core
+      
+      # All optional dependencies that might be needed
+      - trossen-arm>=1.6.0
+      - trossen-slate>=0.0.3
+      - pyserial>=3.5
+      - scikit-image>=0.23.2
+      - pandas>=2.2.2
+      - imagecodecs>=2024.1.1

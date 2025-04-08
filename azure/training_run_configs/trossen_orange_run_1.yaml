@@ -1,0 +1,28 @@
+metadata:
+  description: "ACT Policy on 400 episode pick trossen pick orange dataset"
+  author: "Aravindh"
+  date: "2025-04-08"
+  status: "planned"
+  dataset_name: "trossen_orange_1_10_400_merged"
+  results:
+    success_rate: ""
+    convergence_time: ""
+    notes: ""
+
+parameters:
+  dataset:
+    repo_id: "null"
+    
+  policy:
+    type: "act"
+    device: "cuda"
+    use_amp: true
+
+
+  num_workers: 16    
+  batch_size: 32
+  steps: 300000
+  job_name: "trossen_orange_1_10_400_merged_act"
+    
+  wandb:
+    project: "lerobot"

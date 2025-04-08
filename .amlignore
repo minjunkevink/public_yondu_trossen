@@ -1,0 +1,29 @@
+# .amlignore file - specifies files to ignore when uploading to Azure ML
+
+# Large data directories (use specific paths)
+/datasets/
+/data/
+!/lerobot/common/datasets/  # This line explicitly keeps this directory
+
+
+# Media and data files
+*.mp4
+*.parquet
+
+# Output and model files
+/outputs/
+/models/
+/checkpoints/
+
+# Development directories
+.git/
+__pycache__/
+*.pyc
+
+# Large model files
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.h5
+*.hdf5

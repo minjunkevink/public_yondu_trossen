@@ -495,7 +495,18 @@ class LeRobotDataset(torch.utils.data.Dataset):
         try:
             if force_cache_sync:
                 raise FileNotFoundError
-            assert all((self.root / fpath).is_file() for fpath in self.get_episodes_file_paths())
+            missing_files = []
+            for fpath in self.get_episodes_file_paths():
+                full_path = self.root / fpath
+                if not full_path.is_file():
+                    missing_files.append(str(full_path))
+
+            if missing_files:
+                print(f"ERROR: The following files are missing:")
+                for missing in missing_files:
+                    print(f"  - {missing}")
+                raise FileNotFoundError(f"Missing {len(missing_files)} required dataset files")
+
             self.hf_dataset = self.load_hf_dataset()
         except (AssertionError, FileNotFoundError, NotADirectoryError):
             self.revision = get_safe_version(self.repo_id, self.revision)

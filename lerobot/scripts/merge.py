@@ -1293,13 +1293,14 @@ def merge_datasets(
 
 if __name__ == "__main__":
     # Define source folders and output folder
-    source_folders = ["/home/yondu/Desktop/gitProjects/trossen-lerobot/datasets/trossen_orange_1/", 
-                      "/home/yondu/Desktop/gitProjects/trossen-lerobot/datasets/trossen_orange_2/",
-                      "/home/yondu/Desktop/gitProjects/trossen-lerobot/datasets/trossen_orange_4/",
-                      "/home/yondu/Desktop/gitProjects/trossen-lerobot/datasets/trossen_orange_5/",
+    source_folders = ["/home/yondu/Desktop/gitProjects/trossen-lerobot/datasets/trossen_orange_7/", 
+                      "/home/yondu/Desktop/gitProjects/trossen-lerobot/datasets/trossen_orange_8/",
+                      "/home/yondu/Desktop/gitProjects/trossen-lerobot/datasets/trossen_orange_9/",
+                      "/home/yondu/Desktop/gitProjects/trossen-lerobot/datasets/trossen_orange_10/",
+                      "/home/yondu/Desktop/gitProjects/trossen-lerobot/datasets/trossen_orange_1_5_merged/",
                     ]
 
-    output_folder = "/home/yondu/Desktop/gitProjects/trossen-lerobot/datasets/trossen_orange_1_5_merged/"
+    output_folder = "/home/yondu/Desktop/gitProjects/trossen-lerobot/datasets/trossen_orange_1_10_400_merged/"
 
     # 设置默认FPS
     default_fps = 30
