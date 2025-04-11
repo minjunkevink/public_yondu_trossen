@@ -17,12 +17,13 @@ parameters:
     type: "act"
     device: "cuda"
     use_amp: true
+    n_obs_steps: 8
 
 
   num_workers: 8    
   batch_size: 32
-  steps: 100000
-  job_name: "trossen_orange_1_10_400_merged_act"
+  steps: 200000
+  job_name: "trossen_orange_400_merged_act_obs8"
     
   wandb:
     project: "lerobot"

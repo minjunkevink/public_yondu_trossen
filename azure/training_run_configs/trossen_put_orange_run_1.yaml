@@ -1,9 +1,12 @@
 metadata:
-  description: "ACT Policy on 400 episode pick trossen pick orange dataset"
+  description: "ACT Policy on 50 episodes: 
+  Task Descroption: Put orange in basket, 
+  Variations: Objects: No, Robot positions: No, Camera positions: No
+  Camera: Wrist and overhead"
   author: "Aravindh"
   date: "2025-04-08"
   status: "planned"
-  dataset_name: "trossen_orange_1_10_400_merged"
+  dataset_name: "trossen_put_orange_2_0_50_2cam"
   results:
     success_rate: ""
     convergence_time: ""
@@ -17,12 +20,13 @@ parameters:
     type: "act"
     device: "cuda"
     use_amp: true
+    n_obs_steps: 1
 
 
   num_workers: 8    
-  batch_size: 32
+  batch_size: 8
   steps: 100000
-  job_name: "trossen_orange_1_10_400_merged_act"
+  job_name: "trossen_put_orange_act_2_0_50_2cam"
     
   wandb:
     project: "lerobot"

@@ -1,0 +1,32 @@
+metadata:
+  description: "Diffusion Policy on 50 episodes: 
+  Task Descroption: Put orange in basket, 
+  Variations: Objects: No, Robot positions: No, Camera positions: No
+  Camera: Wrist"
+  author: "Aravindh"
+  date: "2025-04-08"
+  status: "planned"
+  dataset_name: "trossen_put_orange_2_0_50_wrist"
+  results:
+    success_rate: ""
+    convergence_time: ""
+    notes: ""
+
+parameters:
+  dataset:
+    repo_id: "null"
+    
+  policy:
+    type: "diffusion"
+    device: "cuda"
+    use_amp: true
+    n_obs_steps: 1
+
+
+  num_workers: 12   
+  batch_size: 8
+  steps: 100000
+  job_name: "trossen_put_orange_diffusion_2_0_50_wrist"
+    
+  wandb:
+    project: "lerobot"

@@ -57,6 +57,12 @@ def dict_to_cmd_args(param_dict):
     for k, v in param_dict.items():
         if v is None or v == "null":
             v = "null"
+        elif isinstance(v, bool):
+            # Handle Python boolean values
+            v = "true" if v else "false"
+        elif isinstance(v, str) and v.lower() in ("true", "false"):
+            # Handle string boolean values, converting to lowercase
+            v = v.lower()
         cmd_args.append(f"--{k}={v}")
     return " ".join(cmd_args)
 
@@ -163,7 +169,7 @@ def main():
             environment="trossen_lerobot_env@latest",
             resources=dict(instance_count=1),
             command=f"""
-                # Add current directory to Python path to find the lerobot module
+                # Add current directory to Python path
                 export PYTHONPATH=$PYTHONPATH:$(pwd)
                 
                 # Verify Python can find the module
@@ -172,17 +178,20 @@ def main():
                 # Add timestamp to output directory
                 export OUTPUT_DIR="${{outputs.model_output}}/{timestamp}"
 
+                # Set environment variables
                 export HF_USER="Aravindh25"
+                export NVIDIA_TF32_OVERRIDE=1  # Enable TF32 for A100
                 
-                # Create logs directory
+                # Create directories
                 mkdir -p ./logs
+                mkdir -p /tmp/dataset_cache
                 
-                # Copy dataset to local SSD (this runs once at job start)
+                # Copy dataset to local SSD
                 echo "Copying dataset to local SSD..."
                 cp -r ${{inputs.data_dir}}/* /tmp/dataset_cache/
                 
-                # Run training using the local copy
-                python lerobot/scripts/train.py {cmd_args} --dataset.root=/tmp/dataset_cache --output_dir=${{outputs.model_output}} 2>&1 | tee ./logs/{log_filename}
+                # Run training with fixed parameters
+                python lerobot/scripts/train.py {cmd_args} --dataset.root=/tmp/dataset_cache --output_dir=$OUTPUT_DIR --policy.use_amp=true 2>&1 | tee ./logs/{log_filename}
                 cp ./logs/{log_filename} ${{outputs.model_output}}/
             """,
         )

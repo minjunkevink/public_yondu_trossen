@@ -88,6 +88,9 @@ class RecordControlConfig(ControlConfig):
     # Resume recording on an existing dataset.
     resume: bool = False
 
+    # Start position of the robot in degs
+    start_position: list[float] | None = None
+
     def __post_init__(self):
         # HACK: We parse again the cli args here to get the pretrained path if there was one.
         policy_path = parser.get_path_arg("control.policy")

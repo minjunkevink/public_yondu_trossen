@@ -136,6 +136,7 @@ python lerobot/scripts/control_robot.py \
 
 import logging
 import time
+import numpy as np
 from dataclasses import asdict
 from pprint import pformat
 
@@ -330,7 +331,16 @@ def record(
 
     # Store the arm positions after warmup - these will be our start positions for each episode
     saved_arm_positions = save_arm_positions(robot)
-    print("Preserving the arm position you set during warmup period...")
+    print("Preserving the arm position you set during warmup period...", saved_arm_positions)
+
+    if cfg.start_position:
+        position_array = np.array(cfg.start_position, dtype=np.float32)
+        arm_positions = {'main': position_array}
+        saved_arm_positions = arm_positions
+        print(f"Restoring arm positions to {cfg.start_position}")
+        restore_arm_positions(robot, saved_arm_positions)
+
+
 
     recorded_episodes = 0
     while True:
