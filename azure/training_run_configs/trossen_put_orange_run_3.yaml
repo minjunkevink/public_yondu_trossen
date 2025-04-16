@@ -19,12 +19,10 @@ parameters:
   policy:
     type: "diffusion"
     device: "cuda"
-    use_amp: true
-    n_obs_steps: 1
 
 
   num_workers: 8    
-  batch_size: 32
+  batch_size: 8
   steps: 200000
   job_name: "trossen_put_orange_diffusion_2_0_50_2cam"
     

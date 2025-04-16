@@ -1293,13 +1293,11 @@ def merge_datasets(
 
 if __name__ == "__main__":
     # Define source folders and output folder
-    source_folders = ["../../datasets/trossen_orange_7/", 
-                      "../../datasets/trossen_orange_8/",
-                      "../../datasets/trossen_orange_9/",
-                      "../../datasets/trossen_orange_10/",
+    source_folders = ["./datasets/trossen_orange_1_10_400_merged/", 
+                      "./datasets/trossen_put_orange_merged_20_31_100_2cam/",
                     ]
 
-    output_folder = "../../datasets/trossen_orange_200_710_merged_2_cam/"
+    output_folder = "./datasets/trossen_orange_500_merged_1cam/"
 
     # 设置默认FPS
     default_fps = 30

@@ -19,8 +19,6 @@ parameters:
   policy:
     type: "diffusion"
     device: "cuda"
-    use_amp: true
-    n_obs_steps: 1
 
 
   num_workers: 12   

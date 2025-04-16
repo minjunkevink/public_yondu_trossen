@@ -10,7 +10,7 @@ if [ -z "$HF_USER" ]; then
 fi
 
 echo "Starting recording with HF_USER: $HF_USER"
-echo "Recording 2 episodes of 30 seconds each..."
+echo "Recording ..."
 
 # Run the recording command
 python lerobot/scripts/control_robot.py \
