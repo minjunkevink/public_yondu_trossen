@@ -68,11 +68,59 @@ def main(dataset_dir: str, dataset_name: str = None) -> None:
     )
 
 
+def upload_single_file(dataset_name: str, local_file_path: str, destination_path: str) -> None:
+    """Upload a single file to an existing dataset.
+    
+    Args:
+        dataset_name: Name of the existing dataset
+        local_file_path: Path to the file to upload
+        destination_path: Relative path within the dataset (e.g., 'meta/new_file.json')
+    """
+    # Load configuration and set up ML client
+    dirname = os.path.abspath(os.path.dirname(__file__))
+    azure_config = load_yaml(os.path.join(dirname, "azure_config.yml"))
+    
+    credential = DefaultAzureCredential()
+    ml_client = MLClient(
+        credential=credential,
+        subscription_id=azure_config["subscription_id"],
+        resource_group_name=azure_config["resource_group"],
+        workspace_name=azure_config["workspace_name"],
+    )
+    
+    # Get dataset details
+    dataset = ml_client.data.get(name=dataset_name, version="1")
+    
+    # Extract storage info and upload directly (similar to Option 2)
+    # ...
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Upload a dataset to Azure ML")
-    parser.add_argument("--dataset_dir", type=str, required=True, 
+    
+    # Create an argument group for the different upload modes
+    group = parser.add_mutually_exclusive_group(required=True)
+    
+    # Add the dataset_dir as an option in one group
+    group.add_argument("--dataset_dir", type=str, 
                        help="Local directory path containing the dataset")
+    
+    # Add the single_file as an option in another group
+    group.add_argument("--single_file", type=str,
+                       help="Upload a single file instead of the entire directory")
+    
+    # Other arguments
     parser.add_argument("--dataset_name", type=str, default=None,
                        help="Name for the dataset in Azure ML (uses config value if not provided)")
+    parser.add_argument("--destination_path", type=str, default=None,
+                       help="Destination path for the single file within the dataset")
+    
     args = parser.parse_args()
-    main(dataset_dir=args.dataset_dir, dataset_name=args.dataset_name)
+    
+    # Check which mode we're running in
+    if args.single_file:
+        if not args.destination_path:
+            parser.error("--destination_path is required when using --single_file")
+        upload_single_file(args.dataset_name, args.single_file, args.destination_path)
+    else:
+        main(dataset_dir=args.dataset_dir, dataset_name=args.dataset_name)
