@@ -139,6 +139,9 @@ import time
 import numpy as np
 from dataclasses import asdict
 from pprint import pformat
+from PIL import Image
+import os
+from pathlib import Path
 
 # from safetensors.torch import load_file, save_file
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
@@ -455,6 +458,46 @@ def control_robot(cfg: ControlPipelineConfig):
         # Disconnect manually to avoid a "Core dump" during process
         # termination due to camera threads not properly exiting.
         robot.disconnect()
+
+
+# Add this new function to save depth frames
+def save_depth(depth_tensor, key, frame_index, episode_index, videos_dir):
+    """
+    Save a depth frame tensor as a 16-bit PNG file.
+    
+    Args:
+        depth_tensor: Tensor containing depth data
+        key: The depth frame key (e.g., 'observation.depth.camera1')
+        frame_index: Index of the current frame
+        episode_index: Index of the current episode
+        videos_dir: Base directory for saving depth frames
+    """
+    try:
+        # Convert depth tensor to numpy uint16 array
+        if isinstance(depth_tensor, torch.Tensor):
+            depth_array = depth_tensor.cpu().numpy().astype(np.uint16)
+        else:
+            depth_array = np.asarray(depth_tensor).astype(np.uint16)
+        
+        # Handle potential channel dimension
+        if len(depth_array.shape) == 3 and depth_array.shape[0] == 1:
+            # If it's a single channel image with shape [1, H, W], remove the channel dimension
+            depth_array = depth_array[0]
+        
+        # Create directory path for depth frames
+        # Use similar structure to image frames but with 'depth' folder
+        depth_dir = videos_dir / f"depth/{key}/episode_{episode_index:06d}"
+        os.makedirs(depth_dir, exist_ok=True)
+        
+        # Save as 16-bit PNG
+        depth_path = depth_dir / f"frame_{frame_index:06d}.png"
+        depth_img = Image.fromarray(depth_array)
+        depth_img.save(depth_path)
+        
+        return str(depth_path)
+    except Exception as e:
+        logging.error(f"Error saving depth frame: {e}")
+        return None
 
 
 if __name__ == "__main__":

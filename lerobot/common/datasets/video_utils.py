@@ -21,8 +21,9 @@ import warnings
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, List, Dict, Optional, Union
 
+import numpy as np
 import pyarrow as pa
 import torch
 import torchvision
@@ -326,6 +327,29 @@ class VideoFrame:
         return self.pa_type
 
 
+@dataclass
+class DepthFrame:
+    """
+    Provides a type for a dataset containing depth frame images.
+    
+    Depth frames are typically stored as 16-bit PNG files that represent depth values.
+    
+    Example:
+    
+    ```python
+    data_dict = [{"depth": {"path": "depth_frames/frame_000001.png"}}]
+    features = {"depth": DepthFrame()}
+    Dataset.from_dict(data_dict, features=Features(features))
+    ```
+    """
+    
+    pa_type: ClassVar[Any] = pa.struct({"path": pa.string()})
+    _type: str = field(default="DepthFrame", init=False, repr=False)
+    
+    def __call__(self):
+        return self.pa_type
+
+
 with warnings.catch_warnings():
     warnings.filterwarnings(
         "ignore",
@@ -334,6 +358,8 @@ with warnings.catch_warnings():
     )
     # to make VideoFrame available in HuggingFace `datasets`
     register_feature(VideoFrame, "VideoFrame")
+    # to make DepthFrame available in HuggingFace `datasets`
+    register_feature(DepthFrame, "DepthFrame")
 
 
 def get_audio_info(video_path: Path | str) -> dict:
@@ -435,3 +461,81 @@ def get_image_pixel_channels(image: Image):
         return 4  # RGBA
     else:
         raise ValueError("Unknown format")
+
+
+def load_depth_frames(
+    item: Dict[str, Any],
+    depth_frame_keys: List[str],
+    videos_dir: Optional[Union[str, Path]] = None,
+) -> Dict[str, Any]:
+    """
+    Loads depth frames from PNG files referenced in a dataset item.
+    
+    Args:
+        item: The dictionary containing keys pointing to depth frames
+        depth_frame_keys: A list of keys in the item that are depth frames
+        videos_dir: Optional path to resolve relative paths
+        
+    Returns:
+        The updated item with depth frames loaded as tensors
+    """
+    videos_dir = Path(videos_dir) if videos_dir is not None else None
+    
+    for key in depth_frame_keys:
+        if key not in item:
+            continue
+            
+        frame_refs = item[key]
+        
+        # Handle list of frames (multiple frames)
+        if isinstance(frame_refs, list):
+            try:
+                frames = []
+                for frame_ref in frame_refs:
+                    path = frame_ref["path"]
+                    # Resolve path if videos_dir is provided
+                    if videos_dir is not None and not Path(path).is_absolute():
+                        path = videos_dir / path
+                        
+                    # Load depth image with PIL and convert to torch tensor with uint16 precision
+                    depth_img = Image.open(path)
+                    depth_array = np.array(depth_img, dtype=np.uint16)
+                    depth_tensor = torch.from_numpy(depth_array)
+                    
+                    # Add channel dimension if not present (shape becomes [1, H, W])
+                    if len(depth_tensor.shape) == 2:
+                        depth_tensor = depth_tensor.unsqueeze(0)
+                        
+                    frames.append(depth_tensor)
+                    
+                # Stack all frames into a single tensor
+                item[key] = torch.stack(frames) if frames else None
+                
+            except Exception as e:
+                logging.warning(f"Failed to load depth frames for key {key}: {e}")
+                item[key] = None
+                
+        # Handle single frame (dictionary with a path)
+        elif isinstance(frame_refs, dict):
+            try:
+                path = frame_refs["path"]
+                # Resolve path if videos_dir is provided
+                if videos_dir is not None and not Path(path).is_absolute():
+                    path = videos_dir / path
+                    
+                # Load depth image with PIL and convert to torch tensor with uint16 precision
+                depth_img = Image.open(path)
+                depth_array = np.array(depth_img, dtype=np.uint16)
+                depth_tensor = torch.from_numpy(depth_array)
+                
+                # Add channel dimension if not present (shape becomes [1, H, W])
+                if len(depth_tensor.shape) == 2:
+                    depth_tensor = depth_tensor.unsqueeze(0)
+                    
+                item[key] = depth_tensor
+                
+            except Exception as e:
+                logging.warning(f"Failed to load depth frame for key {key}: {e}")
+                item[key] = None
+                
+    return item

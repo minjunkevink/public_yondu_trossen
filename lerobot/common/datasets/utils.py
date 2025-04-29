@@ -388,13 +388,45 @@ def get_hf_features_from_features(features: dict) -> datasets.Features:
 
 
 def get_features_from_robot(robot: Robot, use_videos: bool = True) -> dict:
-    camera_ft = {}
-    if robot.cameras:
-        camera_ft = {
-            key: {"dtype": "video" if use_videos else "image", **ft}
-            for key, ft in robot.camera_features.items()
+    """Extract features (modality information) from robot."""
+    features = {}
+
+    # Add state info for both follower and leader arms
+    action_names = robot.get_motor_names(robot.leader_arms)
+    state_names = robot.get_motor_names(robot.follower_arms)
+    features["action"] = {
+        "dtype": "float32",
+        "shape": (len(action_names),),
+        "names": action_names,
+    }
+    features["observation.state"] = {
+        "dtype": "float32",
+        "shape": (len(state_names),),
+        "names": state_names,
+    }
+
+    # Add info from all cameras
+    for cam_name, cam in robot.cameras.items():
+        cam_img_key = f"observation.images.{cam_name}"
+        img_dtype = "video" if use_videos else "image"
+        features[cam_img_key] = {
+            "dtype": img_dtype,
+            "shape": (cam.height, cam.width, cam.channels),
+            "names": ["height", "width", "channels"],
+            "info": None,
         }
-    return {**robot.motor_features, **camera_ft, **DEFAULT_FEATURES}
+        
+        # Add depth feature if the camera has depth enabled
+        if hasattr(cam, 'config') and getattr(cam.config, 'use_depth', False):
+            cam_depth_key = f"observation.depth.{cam_name}"
+            features[cam_depth_key] = {
+                "dtype": "depth",  # Set to 'depth' type
+                "shape": (cam.height, cam.width, 1),  # Depth is single-channel
+                "names": ["height", "width", "channels"],
+                "info": None,
+            }
+
+    return features
 
 
 def dataset_to_policy_features(features: dict[str, dict]) -> dict[str, PolicyFeature]:

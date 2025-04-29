@@ -19,13 +19,14 @@ python lerobot/scripts/control_robot.py \
 --control.type=record \
 --control.fps=30 \
 --control.single_task="Put the orange in the basket" \
---control.repo_id=${HF_USER}/trossen_put_orange_dataset_3_1 \
+--control.repo_id=${HF_USER}/test_depth_2 \
 --control.tags='["tutorial"]' \
---control.warmup_time_s=10 \
---control.episode_time_s=8 \
---control.reset_time_s=30 \
---control.num_episodes=50 \
---control.push_to_hub=true \
---control.display_cameras=false
+--control.warmup_time_s=3 \
+--control.episode_time_s=3 \
+--control.reset_time_s=3 \
+--control.num_episodes=2 \
+--control.push_to_hub=false \
+--control.display_cameras=false \
+
 
 echo "Recording completed!"

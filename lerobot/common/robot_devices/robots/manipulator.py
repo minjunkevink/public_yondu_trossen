@@ -546,19 +546,37 @@ class ManipulatorRobot:
 
         # Capture images from cameras
         images = {}
+        depth_images = {}
         for name in self.cameras:
             before_camread_t = time.perf_counter()
-            images[name] = self.cameras[name].async_read()
-            images[name] = torch.from_numpy(images[name])
+            camera_output = self.cameras[name].async_read()
             self.logs[f"read_camera_{name}_dt_s"] = self.cameras[name].logs["delta_timestamp_s"]
             self.logs[f"async_read_camera_{name}_dt_s"] = time.perf_counter() - before_camread_t
+            
+            # Handle different camera output formats (RGB only or RGB+Depth)
+            if isinstance(camera_output, tuple) and len(camera_output) == 2:
+                # Camera provides both RGB and depth frames
+                rgb_frame, depth_frame = camera_output
+                images[name] = torch.from_numpy(rgb_frame)
+                depth_images[name] = torch.from_numpy(depth_frame.astype(np.uint16))
+            elif isinstance(camera_output, np.ndarray):
+                # Camera provides only RGB frame
+                images[name] = torch.from_numpy(camera_output)
+            else:
+                logging.warning(f"Unexpected camera output type for camera '{name}': {type(camera_output)}")
+                continue
 
         # Populate output dictionaries
         obs_dict, action_dict = {}, {}
         obs_dict["observation.state"] = state
         action_dict["action"] = action
+        
+        # Add RGB and depth images to observation
         for name in self.cameras:
-            obs_dict[f"observation.images.{name}"] = images[name]
+            if name in images:
+                obs_dict[f"observation.images.{name}"] = images[name]
+            if name in depth_images:
+                obs_dict[f"observation.depth.{name}"] = depth_images[name]
 
         return obs_dict, action_dict
 
@@ -586,18 +604,37 @@ class ManipulatorRobot:
 
         # Capture images from cameras
         images = {}
+        depth_images = {}
         for name in self.cameras:
             before_camread_t = time.perf_counter()
-            images[name] = self.cameras[name].async_read()
-            images[name] = torch.from_numpy(images[name])
+            camera_output = self.cameras[name].async_read()
             self.logs[f"read_camera_{name}_dt_s"] = self.cameras[name].logs["delta_timestamp_s"]
             self.logs[f"async_read_camera_{name}_dt_s"] = time.perf_counter() - before_camread_t
+            
+            # Handle different camera output formats (RGB only or RGB+Depth)
+            if isinstance(camera_output, tuple) and len(camera_output) == 2:
+                # Camera provides both RGB and depth frames
+                rgb_frame, depth_frame = camera_output
+                images[name] = torch.from_numpy(rgb_frame)
+                depth_images[name] = torch.from_numpy(depth_frame.astype(np.uint16))
+            elif isinstance(camera_output, np.ndarray):
+                # Camera provides only RGB frame
+                images[name] = torch.from_numpy(camera_output)
+            else:
+                logging.warning(f"Unexpected camera output type for camera '{name}': {type(camera_output)}")
+                continue
 
         # Populate output dictionaries and format to pytorch
         obs_dict = {}
         obs_dict["observation.state"] = state
+        
+        # Add RGB and depth images to observation
         for name in self.cameras:
-            obs_dict[f"observation.images.{name}"] = images[name]
+            if name in images:
+                obs_dict[f"observation.images.{name}"] = images[name]
+            if name in depth_images:
+                obs_dict[f"observation.depth.{name}"] = depth_images[name]
+            
         return obs_dict
 
     def send_action(self, action: torch.Tensor) -> torch.Tensor:

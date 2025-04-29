@@ -67,10 +67,12 @@ from lerobot.common.datasets.utils import (
 )
 from lerobot.common.datasets.video_utils import (
     VideoFrame,
+    DepthFrame,
     decode_video_frames,
     encode_video_frames,
     get_safe_default_codec,
     get_video_info,
+    load_depth_frames,
 )
 from lerobot.common.robot_devices.robots.utils import Robot
 
@@ -732,6 +734,20 @@ class LeRobotDataset(torch.utils.data.Dataset):
     def __len__(self):
         return self.num_frames
 
+    @property
+    def depth_frame_keys(self) -> list[str]:
+        """Keys to access depth frames that need to be loaded from PNG files.
+        
+        Depth frames are typically stored as 16-bit PNG files that represent depth values
+        and need special handling for loading.
+        """
+        depth_frame_keys = []
+        for key, feats in self.hf_features.items():
+            # Check for both the feature class type and _type attribute for compatibility
+            if isinstance(feats, DepthFrame) or getattr(feats, "_type", None) == "DepthFrame":
+                depth_frame_keys.append(key)
+        return depth_frame_keys
+
     def __getitem__(self, idx) -> dict:
         item = self.hf_dataset[idx]
         ep_idx = item["episode_index"].item()
@@ -744,11 +760,20 @@ class LeRobotDataset(torch.utils.data.Dataset):
             for key, val in query_result.items():
                 item[key] = val
 
+        # Load video frames if available
         if len(self.meta.video_keys) > 0:
             current_ts = item["timestamp"].item()
             query_timestamps = self._get_query_timestamps(current_ts, query_indices)
             video_frames = self._query_videos(query_timestamps, ep_idx)
             item = {**video_frames, **item}
+            
+        # Load depth frames if available
+        depth_keys = self.depth_frame_keys
+        if depth_keys:
+            # Get the videos directory path for resolving relative paths
+            videos_dir = self.root / "videos" if hasattr(self, "root") else None
+            # Use the load_depth_frames function to load depth frames
+            item = load_depth_frames(item, depth_keys, videos_dir)
 
         if self.image_transforms is not None:
             image_keys = self.meta.camera_keys
@@ -830,14 +855,21 @@ class LeRobotDataset(torch.utils.data.Dataset):
                     f"An element of the frame is not in the features. '{key}' not in '{self.features.keys()}'."
                 )
 
-            if self.features[key]["dtype"] in ["image", "video"]:
-                img_path = self._get_image_file_path(
-                    episode_index=self.episode_buffer["episode_index"], image_key=key, frame_index=frame_index
-                )
-                if frame_index == 0:
-                    img_path.parent.mkdir(parents=True, exist_ok=True)
-                self._save_image(frame[key], img_path)
-                self.episode_buffer[key].append(str(img_path))
+            if self.features[key]["dtype"] in ["image", "video", "depth"]:  # Add "depth" type
+                if key.startswith("observation.depth."):
+                    # This is a depth frame path
+                    self.episode_buffer[key].append(frame[key])
+                else:
+                    # This is a regular image or video path
+                    img_path = self._get_image_file_path(
+                        episode_index=self.episode_buffer["episode_index"], 
+                        image_key=key, 
+                        frame_index=frame_index
+                    )
+                    if frame_index == 0:
+                        img_path.parent.mkdir(parents=True, exist_ok=True)
+                    self._save_image(frame[key], img_path)
+                    self.episode_buffer[key].append(str(img_path))
             else:
                 self.episode_buffer[key].append(frame[key])
 
@@ -1040,6 +1072,16 @@ class LeRobotDataset(torch.utils.data.Dataset):
         obj.delta_indices = None
         obj.episode_data_index = None
         obj.video_backend = video_backend if video_backend is not None else get_safe_default_codec()
+
+        # Update feature schema to properly identify depth frames
+        if features is not None:
+            # Identify depth features by their naming pattern and update their type
+            for key, feature in features.items():
+                # If the feature key matches a depth pattern and isn't already typed as DepthFrame
+                if "observation.depth" in key and feature.get("dtype") == "image":
+                    # Mark it as a depth frame
+                    feature["dtype"] = "depth"
+        
         return obj
 
 
@@ -1170,6 +1212,15 @@ class MultiLeRobotDataset(torch.utils.data.Dataset):
         return video_frame_keys
 
     @property
+    def depth_frame_keys(self) -> list[str]:
+        """Keys to access depth frames that need to be loaded from PNG files."""
+        keys = []
+        for key, feats in self.features.items():
+            if isinstance(feats, DepthFrame) or getattr(feats, "_type", None) == "DepthFrame":
+                keys.append(key)
+        return keys
+
+    @property
     def num_frames(self) -> int:
         """Number of samples/frames."""
         return sum(d.num_frames for d in self._datasets)
@@ -1207,6 +1258,14 @@ class MultiLeRobotDataset(torch.utils.data.Dataset):
             raise AssertionError("We expect the loop to break out as long as the index is within bounds.")
         item = self._datasets[dataset_idx][idx - start_idx]
         item["dataset_index"] = torch.tensor(dataset_idx)
+        
+        # If the dataset doesn't handle depth frames internally,
+        # we need to handle them here
+        depth_keys = self.depth_frame_keys
+        if depth_keys and not any(key in item for key in depth_keys):
+            videos_dir = self.root / self.repo_ids[dataset_idx] / "videos"
+            item = load_depth_frames(item, depth_keys, videos_dir)
+            
         for data_key in self.disabled_features:
             if data_key in item:
                 del item[data_key]
@@ -1223,6 +1282,7 @@ class MultiLeRobotDataset(torch.utils.data.Dataset):
             f"  Recorded Frames per Second: {self.fps},\n"
             f"  Camera Keys: {self.camera_keys},\n"
             f"  Video Frame Keys: {self.video_frame_keys if self.video else 'N/A'},\n"
+            f"  Depth Frame Keys: {self.depth_frame_keys},\n"
             f"  Transformations: {self.image_transforms},\n"
             f")"
         )
