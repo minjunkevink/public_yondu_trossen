@@ -558,6 +558,12 @@ class ManipulatorRobot:
                 # Camera provides both RGB and depth frames
                 rgb_frame, depth_frame = camera_output
                 images[name] = torch.from_numpy(rgb_frame)
+                
+                # Add this check and reshape if needed
+                if len(depth_frame.shape) == 2:  # If depth frame is 2D (H,W)
+                    # Add channel dimension at front to make it (H,W,1)
+                    depth_frame = np.expand_dims(depth_frame, axis=-1)  # Creates (H,W,1)
+                
                 depth_images[name] = torch.from_numpy(depth_frame.astype(np.uint16))
             elif isinstance(camera_output, np.ndarray):
                 # Camera provides only RGB frame
@@ -616,6 +622,12 @@ class ManipulatorRobot:
                 # Camera provides both RGB and depth frames
                 rgb_frame, depth_frame = camera_output
                 images[name] = torch.from_numpy(rgb_frame)
+                
+                # Add this check and reshape if needed
+                if len(depth_frame.shape) == 2:  # If depth frame is 2D (H,W)
+                    # Add channel dimension at front to make it  (H,W,1)
+                    depth_frame = np.expand_dims(depth_frame, axis=-1)  # Creates (H,W,1)
+                
                 depth_images[name] = torch.from_numpy(depth_frame.astype(np.uint16))
             elif isinstance(camera_output, np.ndarray):
                 # Camera provides only RGB frame

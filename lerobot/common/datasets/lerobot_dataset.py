@@ -331,17 +331,15 @@ class LeRobotDatasetMetadata:
             raise ValueError(
                 "Dataset features must either come from a Robot or explicitly passed upon creation."
             )
-        else:
-            # TODO(aliberts, rcadene): implement sanity check for features
-            features = {**features, **DEFAULT_FEATURES}
 
-            # check if none of the features contains a "/" in their names,
-            # as this would break the dict flattening in the stats computation, which uses '/' as separator
-            for key in features:
-                if "/" in key:
-                    raise ValueError(f"Feature names should not contain '/'. Found '/' in feature '{key}'.")
+        # Ensure DEFAULT_FEATURES are always merged, regardless of the source of features
+        features = {**features, **DEFAULT_FEATURES}
 
-            features = {**features, **DEFAULT_FEATURES}
+        # check if none of the features contains a "/" in their names,
+        # as this would break the dict flattening in the stats computation, which uses '/' as separator
+        for key in features:
+            if "/" in key:
+                raise ValueError(f"Feature names should not contain '/'. Found '/' in feature '{key}'.")
 
         obj.tasks, obj.task_to_task_index = {}, {}
         obj.episodes_stats, obj.stats, obj.episodes = {}, {}, {}
@@ -468,6 +466,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
             video_backend (str | None, optional): Video backend to use for decoding videos. Defaults to torchcodec when available int the platform; otherwise, defaults to 'pyav'.
                 You can also use the 'pyav' decoder used by Torchvision, which used to be the default option, or 'video_reader' which is another decoder of Torchvision.
         """
+        print("Initializing LeRobotDataset")
         super().__init__()
         self.repo_id = repo_id
         self.root = Path(root) if root else HF_LEROBOT_HOME / repo_id
@@ -527,6 +526,14 @@ class LeRobotDataset(torch.utils.data.Dataset):
         if self.delta_timestamps is not None:
             check_delta_timestamps(self.delta_timestamps, self.fps, self.tolerance_s)
             self.delta_indices = get_delta_indices(self.delta_timestamps, self.fps)
+
+        # Print all attributes
+        print(f"Attributes: {self.__dict__.keys()}")
+        # Print all the values of the attributes
+        for key, value in self.__dict__.items():
+            print(f"{key}: {value}")
+
+        print("Done initializing LeRobotDataset")
 
     def push_to_hub(
         self,
@@ -827,6 +834,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         temporary directory — nothing is written to disk. To save those frames, the 'save_episode()' method
         then needs to be called.
         """
+        print("Adding frame")
         # Convert torch to numpy if needed
         for name in frame:
             if isinstance(frame[name], torch.Tensor):
@@ -834,8 +842,13 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
         validate_frame(frame, self.features)
 
+
         if self.episode_buffer is None:
+            print("Episode buffer is None")
             self.episode_buffer = self.create_episode_buffer()
+
+        # Print keys in episode_buffer
+        print(f"Episode buffer keys: {self.episode_buffer.keys()}")
 
         # Automatically add frame_index and timestamp to episode buffer
         frame_index = self.episode_buffer["size"]
@@ -856,19 +869,21 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 )
 
             if self.features[key]["dtype"] in ["image", "video", "depth"]:  # Add "depth" type
+                # For all image/video/depth types, save them to disk and store the path
+                img_path = self._get_image_file_path(
+                    episode_index=self.episode_buffer["episode_index"], 
+                    image_key=key, 
+                    frame_index=frame_index
+                )
+                if frame_index == 0:
+                    img_path.parent.mkdir(parents=True, exist_ok=True)
+                self._save_image(frame[key], img_path)
+                
+                # Store the path as a dictionary with "path" key for depth frames to match DepthFrame structure
+                # or as a string for regular images
                 if key.startswith("observation.depth."):
-                    # This is a depth frame path
-                    self.episode_buffer[key].append(frame[key])
+                    self.episode_buffer[key].append({"path": str(img_path)})
                 else:
-                    # This is a regular image or video path
-                    img_path = self._get_image_file_path(
-                        episode_index=self.episode_buffer["episode_index"], 
-                        image_key=key, 
-                        frame_index=frame_index
-                    )
-                    if frame_index == 0:
-                        img_path.parent.mkdir(parents=True, exist_ok=True)
-                    self._save_image(frame[key], img_path)
                     self.episode_buffer[key].append(str(img_path))
             else:
                 self.episode_buffer[key].append(frame[key])

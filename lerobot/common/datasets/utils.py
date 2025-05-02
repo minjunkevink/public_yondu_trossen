@@ -35,6 +35,8 @@ from huggingface_hub.errors import RevisionNotFoundError
 from PIL import Image as PILImage
 from torchvision import transforms
 
+from lerobot.common.datasets.video_utils import DepthFrame
+
 from lerobot.common.datasets.backward_compatibility import (
     V21_MESSAGE,
     BackwardCompatibilityError,
@@ -367,6 +369,9 @@ def get_hf_features_from_features(features: dict) -> datasets.Features:
             continue
         elif ft["dtype"] == "image":
             hf_features[key] = datasets.Image()
+        elif ft["dtype"] == "depth":
+            # Add this case to handle depth frames
+            hf_features[key] = DepthFrame()
         elif ft["shape"] == (1,):
             hf_features[key] = datasets.Value(dtype=ft["dtype"])
         elif len(ft["shape"]) == 1:
@@ -770,7 +775,7 @@ def validate_feature_dtype_and_shape(name: str, feature: dict, value: np.ndarray
     expected_shape = feature["shape"]
     if is_valid_numpy_dtype_string(expected_dtype):
         return validate_feature_numpy_array(name, expected_dtype, expected_shape, value)
-    elif expected_dtype in ["image", "video"]:
+    elif expected_dtype in ["image", "video", "depth"]:
         return validate_feature_image_or_video(name, expected_shape, value)
     elif expected_dtype == "string":
         return validate_feature_string(name, value)
