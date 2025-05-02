@@ -39,14 +39,31 @@ def ensure_safe_goal_position(
 ):
     # Cap relative action target magnitude for safety.
     diff = goal_pos - present_pos
-    max_relative_target = torch.tensor(max_relative_target)
-    safe_diff = torch.minimum(diff, max_relative_target)
-    safe_diff = torch.maximum(safe_diff, -max_relative_target)
+    
+    # Convert max_relative_target to a tensor if it's not already
+    max_relative_target_tensor = torch.tensor(max_relative_target)
+    
+    # Create a mask to only clamp the first 6 joints (indices 0-5)
+    # Assuming the tensor shape is consistent with 7 joints
+    mask = torch.ones_like(diff)
+    if len(diff) >= 7:  # Make sure there are at least 7 elements
+        mask[6:] = 0  # Set the 7th joint (index 6) and any following joints to 0 in the mask
+    
+    # Apply the mask to the max_relative_target
+    effective_max = max_relative_target_tensor * mask
+    
+    # Apply clamping only where the mask is non-zero
+    safe_diff = torch.where(
+        mask > 0,
+        torch.minimum(torch.maximum(diff, -max_relative_target_tensor), max_relative_target_tensor),
+        diff  # For the 7th joint (and any following), use the original diff value
+    )
+    
     safe_goal_pos = present_pos + safe_diff
 
     if not torch.allclose(goal_pos, safe_goal_pos):
         logging.warning(
-            "Relative goal position magnitude had to be clamped to be safe.\n"
+            "Relative goal position magnitude had to be clamped to be safe (except for the 7th joint).\n"
             f"  requested relative goal position target: {diff}\n"
             f"    clamped relative goal position target: {safe_diff}"
         )
@@ -499,7 +516,7 @@ class ManipulatorRobot:
             if self.config.max_relative_target is not None:
                 present_pos = self.follower_arms[name].read("Present_Position")
                 present_pos = torch.from_numpy(present_pos)
-                goal_pos = ensure_safe_goal_position(goal_pos, present_pos, self.config.max_relative_target)
+                # goal_pos = ensure_safe_goal_position(goal_pos, present_pos, self.config.max_relative_target)
 
             # Used when record_data=True
             follower_goal_pos[name] = goal_pos

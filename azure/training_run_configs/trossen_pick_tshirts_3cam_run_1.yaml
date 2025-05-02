@@ -1,0 +1,32 @@
+metadata:
+  description: "ACT Policy on 80 episodes: 
+  Task Descroption: Pick tshirts 3cam, combined 2 (last 20 eps) and 3 datasets, 
+  Variations: Objects: (Positions of tshirts changed), Robot positions: No, Camera positions: No
+  Camera: Wrist , overhead, front"
+  author: "Aravindh"
+  date: "2025-04-12"
+  status: "planned"
+  dataset_name: "trossen_pick_tshirt_3cam_v2m"
+  results:
+    success_rate: ""
+    convergence_time: ""
+    notes: ""
+
+parameters:
+  dataset:
+    repo_id: "null"
+    
+  policy:
+    type: "act"
+    device: "cuda"
+    use_amp: true
+    n_obs_steps: 1
+
+
+  num_workers: 8   
+  batch_size: 8
+  steps: 200000
+  job_name: "trossen_pick_tshirts_3cam_run_1"
+    
+  wandb:
+    project: "lerobot"
