@@ -834,7 +834,6 @@ class LeRobotDataset(torch.utils.data.Dataset):
         temporary directory — nothing is written to disk. To save those frames, the 'save_episode()' method
         then needs to be called.
         """
-        print("Adding frame")
         # Convert torch to numpy if needed
         for name in frame:
             if isinstance(frame[name], torch.Tensor):
@@ -842,13 +841,8 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
         validate_frame(frame, self.features)
 
-
         if self.episode_buffer is None:
-            print("Episode buffer is None")
             self.episode_buffer = self.create_episode_buffer()
-
-        # Print keys in episode_buffer
-        print(f"Episode buffer keys: {self.episode_buffer.keys()}")
 
         # Automatically add frame_index and timestamp to episode buffer
         frame_index = self.episode_buffer["size"]
@@ -868,7 +862,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
                     f"An element of the frame is not in the features. '{key}' not in '{self.features.keys()}'."
                 )
 
-            if self.features[key]["dtype"] in ["image", "video", "depth"]:  # Add "depth" type
+            if self.features[key]["dtype"] in ["image", "video", "depth"]:
                 # For all image/video/depth types, save them to disk and store the path
                 img_path = self._get_image_file_path(
                     episode_index=self.episode_buffer["episode_index"], 
@@ -877,13 +871,31 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 )
                 if frame_index == 0:
                     img_path.parent.mkdir(parents=True, exist_ok=True)
-                self._save_image(frame[key], img_path)
                 
-                # Store the path as a dictionary with "path" key for depth frames to match DepthFrame structure
-                # or as a string for regular images
+                # Special handling for depth images
                 if key.startswith("observation.depth."):
-                    self.episode_buffer[key].append({"path": str(img_path)})
+                    # Get the depth array
+                    depth_array = frame[key]
+                    
+                    # Handle potential channel dimension - could be in either (C, H, W) or (H, W, C) format
+                    if len(depth_array.shape) == 3:
+                        if depth_array.shape[0] == 1:  # Channel-first format (1, H, W)
+                            depth_array = depth_array[0]  # Remove channel dimension to get (H, W)
+                        elif depth_array.shape[2] == 1:  # Channel-last format (H, W, 1)
+                            depth_array = depth_array[:, :, 0]  # Remove channel dimension to get (H, W)
+                    
+                    try:
+                        # Create PIL Image directly from the array as uint16
+                        depth_img = PIL.Image.fromarray(depth_array.astype(np.uint16))
+                        # Save as 16-bit PNG
+                        depth_img.save(img_path)
+                        # Store the path in episode buffer as dict with "path" key to match DepthFrame structure
+                        self.episode_buffer[key].append({"path": str(img_path)})
+                    except Exception as e:
+                        print(f"Error writing depth image {img_path}: {e}")
                 else:
+                    # Regular image handling
+                    self._save_image(frame[key], img_path)
                     self.episode_buffer[key].append(str(img_path))
             else:
                 self.episode_buffer[key].append(frame[key])
@@ -956,6 +968,39 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
         parquet_files = list(self.root.rglob("*.parquet"))
         assert len(parquet_files) == self.num_episodes
+
+        # Copy depth images to a permanent location before deleting the images directory
+        depth_keys = [key for key in self.features if self.features[key]["dtype"] == "depth"]
+        if depth_keys:
+            img_dir = self.root / "images"
+            depth_dir = self.root / "depth_images"
+            
+            if img_dir.is_dir():
+                depth_dir.mkdir(exist_ok=True, parents=True)
+                
+                # Copy depth image directories to the permanent location
+                for key in depth_keys:
+                    src_depth_dir = img_dir / key
+                    if src_depth_dir.is_dir():
+                        dst_depth_dir = depth_dir / key
+                        if not dst_depth_dir.exists():
+                            shutil.copytree(src_depth_dir, dst_depth_dir)
+                        else:
+                            # If it exists, copy only the episode subfolder
+                            for ep_dir in src_depth_dir.iterdir():
+                                if ep_dir.is_dir() and f"episode_{episode_index:06d}" in ep_dir.name:
+                                    dst_ep_dir = dst_depth_dir / ep_dir.name
+                                    if not dst_ep_dir.exists():
+                                        shutil.copytree(ep_dir, dst_ep_dir)
+                
+                # Update paths in the parquet files
+                for key in depth_keys:
+                    for i in range(len(episode_buffer[key])):
+                        path_dict = episode_buffer[key][i]
+                        if isinstance(path_dict, dict) and "path" in path_dict:
+                            old_path = path_dict["path"]
+                            new_path = old_path.replace("/images/", "/depth_images/")
+                            path_dict["path"] = new_path
 
         # delete images
         img_dir = self.root / "images"

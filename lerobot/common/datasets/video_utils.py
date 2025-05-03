@@ -493,10 +493,17 @@ def load_depth_frames(
                 frames = []
                 for frame_ref in frame_refs:
                     path = frame_ref["path"]
+                    
                     # Resolve path if videos_dir is provided
                     if videos_dir is not None and not Path(path).is_absolute():
                         path = videos_dir / path
-                        
+                    
+                    # If the path doesn't exist, try looking in depth_images directory
+                    if not Path(path).exists() and "/images/" in str(path):
+                        alt_path = str(path).replace("/images/", "/depth_images/")
+                        if Path(alt_path).exists():
+                            path = alt_path
+                            
                     # Load depth image with PIL and convert to torch tensor with uint16 precision
                     depth_img = Image.open(path)
                     depth_array = np.array(depth_img, dtype=np.uint16)
@@ -519,10 +526,17 @@ def load_depth_frames(
         elif isinstance(frame_refs, dict):
             try:
                 path = frame_refs["path"]
+                
                 # Resolve path if videos_dir is provided
                 if videos_dir is not None and not Path(path).is_absolute():
                     path = videos_dir / path
-                    
+                
+                # If the path doesn't exist, try looking in depth_images directory
+                if not Path(path).exists() and "/images/" in str(path):
+                    alt_path = str(path).replace("/images/", "/depth_images/")
+                    if Path(alt_path).exists():
+                        path = alt_path
+                        
                 # Load depth image with PIL and convert to torch tensor with uint16 precision
                 depth_img = Image.open(path)
                 depth_array = np.array(depth_img, dtype=np.uint16)

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Ignore the dataset folder
-datasets/
+/datasets/
 
 # Logging
 logs

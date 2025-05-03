@@ -85,6 +85,10 @@ def get_feature_stats(array: np.ndarray, axis: tuple, keepdims: bool) -> dict[st
 def compute_episode_stats(episode_data: dict[str, list[str] | np.ndarray], features: dict) -> dict:
     ep_stats = {}
     for key, data in episode_data.items():
+        # Skip depth frames entirely as they are stored as dicts with paths
+        if features[key]["dtype"] == "depth":
+            continue
+            
         if features[key]["dtype"] == "string":
             continue  # HACK: we should receive np.arrays of strings
         elif features[key]["dtype"] in ["image", "video"]:
