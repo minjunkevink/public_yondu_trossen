@@ -46,8 +46,8 @@ def ensure_safe_goal_position(
     # Create a mask to only clamp the first 6 joints (indices 0-5)
     # Assuming the tensor shape is consistent with 7 joints
     mask = torch.ones_like(diff)
-    if len(diff) >= 7:  # Make sure there are at least 7 elements
-        mask[6:] = 0  # Set the 7th joint (index 6) and any following joints to 0 in the mask
+    # if len(diff) >= 7:  # Make sure there are at least 7 elements
+    #     mask[6:] = 0  # Set the 7th joint (index 6) and any following joints to 0 in the mask
     
     # Apply the mask to the max_relative_target
     effective_max = max_relative_target_tensor * mask
@@ -516,7 +516,7 @@ class ManipulatorRobot:
             if self.config.max_relative_target is not None:
                 present_pos = self.follower_arms[name].read("Present_Position")
                 present_pos = torch.from_numpy(present_pos)
-                # goal_pos = ensure_safe_goal_position(goal_pos, present_pos, self.config.max_relative_target)
+                #goal_pos = ensure_safe_goal_position(goal_pos, present_pos, self.config.max_relative_target)
 
             # Used when record_data=True
             follower_goal_pos[name] = goal_pos
@@ -695,7 +695,7 @@ class ManipulatorRobot:
             if self.config.max_relative_target is not None:
                 present_pos = self.follower_arms[name].read("Present_Position")
                 present_pos = torch.from_numpy(present_pos)
-                goal_pos = ensure_safe_goal_position(goal_pos, present_pos, self.config.max_relative_target)
+                # goal_pos = ensure_safe_goal_position(goal_pos, present_pos, self.config.max_relative_target)
 
             # Save tensor to concat and return
             action_sent.append(goal_pos)

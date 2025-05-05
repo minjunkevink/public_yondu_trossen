@@ -736,14 +736,22 @@ class TrossenAISoloRobotConfig(ManipulatorRobotConfig):
                 fps=30,
                 width=640,
                 height=480,
-                use_depth=True
+                # use_depth=True
             ),
-            # "cam_high": IntelRealSenseCameraConfig(
-            #     serial_number=250122077604,
-            #     fps=30,
-            #     width=640,
-            #     height=480,
-            # ),
+            "cam_high": IntelRealSenseCameraConfig(
+                serial_number=250122077604,
+                fps=30,
+                width=640,
+                height=480,
+                # use_depth=True
+            ),
+            "cam_front": IntelRealSenseCameraConfig(
+                serial_number=337122073312,
+                fps=30,
+                width=640,
+                height=480,
+                # use_depth=True
+            ),
         }
     )
 
