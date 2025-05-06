@@ -148,6 +148,19 @@ class TrossenArmDriver:
                 traceback.print_exc()
                 # Continue with connection even if this fails
 
+        # Set a default gripper force limit for follower arm
+        if self.model == "V0_FOLLOWER":
+            print("Current gripper force limit scaling factor: ", self.get_gripper_force_limit_scaling_factor())
+            print("Setting default gripper force limit for follower arm...")
+            
+            try:
+                self.set_gripper_force_limit_scaling_factor(0.1)  # 50% of maximum force by default
+                print("After setting force limit scaling factor: ", self.get_gripper_force_limit_scaling_factor())
+            except Exception as e:
+                print(f"Warning: Failed to set gripper force limit: {e}")
+                traceback.print_exc()
+                # Continue with connection even if this fails
+
     def reconnect(self):
         try:
             model_name, model_end_effector = TROSSEN_ARM_MODELS[self.model]
@@ -206,6 +219,9 @@ class TrossenArmDriver:
             values = self.driver.get_positions()
             values[:-1] = np.degrees(values[:-1])  # Convert all joints except gripper
             values[-1] = values[-1] * 10000  # Convert gripper to range (0-450)
+        elif data_name == "Gripper_Force_Limit":
+            # Read the current gripper force limit
+            values = np.array([self.get_gripper_force_limit_scaling_factor()], dtype=np.float32)
         else:
             values = None
             print(f"Data name: {data_name} is not supported for reading.")
@@ -263,6 +279,17 @@ class TrossenArmDriver:
                 
                 # Use a non-zero goal time for smoother transition (2.0 seconds)
                 self.driver.set_all_external_efforts([0.0] * 7, 0.0, True)
+            
+        # Set the gripper force limit scaling factor
+        elif data_name == "Gripper_Force_Limit":
+            # Convert input to float value between 0 and 1
+            if isinstance(values, (list, np.ndarray)):
+                values = float(values[0])
+            else:
+                values = float(values)
+            # Ensure value is between 0 and 1
+            values = max(0.0, min(1.0, values))
+            self.set_gripper_force_limit_scaling_factor(values)
                 
         elif data_name == "Reset":
             self.driver.set_all_modes(trossen.Mode.position)
@@ -344,3 +371,77 @@ class TrossenArmDriver:
         except Exception as e:
             print(f"Error setting custom joint characteristics: {e}")
             return False
+            
+    def get_gripper_force_limit_scaling_factor(self):
+        """
+        Get the current gripper force limit scaling factor.
+        
+        Returns:
+            float: A value between 0.0 and 1.0 where:
+                - 0.0 means no force (gripper won't close)
+                - 1.0 means maximum force as specified in the hardware specs
+                
+        Note:
+            According to the WidowX AI specs, max gripping force is around 340N at full power.
+        """
+        if not self.is_connected:
+            raise RobotDeviceNotConnectedError(
+                f"TrossenArmDriver({self.ip}) is not connected. You need to run `motors_bus.connect()`."
+            )
+            
+        try:
+            # Method 1: Direct API call (preferred)
+            scaling_factor = self.driver.get_gripper_force_limit_scaling_factor()
+            return scaling_factor
+        except Exception as e1:
+            print(f"Warning: Failed to get gripper force limit scaling factor using direct API: {e1}")
+            try:
+                # Method 2: Via end effector properties
+                end_effector = self.driver.get_end_effector()
+                scaling_factor = end_effector.t_max_factor
+                return scaling_factor
+            except Exception as e2:
+                print(f"Error getting gripper force limit scaling factor: {e2}")
+                return None
+    
+    def set_gripper_force_limit_scaling_factor(self, scaling_factor=0.5):
+        """
+        Set the maximum force that the gripper can apply.
+        
+        Args:
+            scaling_factor (float): A value between 0.0 and 1.0 where:
+                - 0.0 means no force (gripper won't close)
+                - 1.0 means maximum force as specified in the hardware specs
+                - Default is 0.5 (50% of maximum force)
+                
+        Returns:
+            bool: True if successful, False otherwise
+                
+        Note:
+            This is particularly useful for preventing damage to objects when grasping.
+            According to the WidowX AI specs, max gripping force is around 340N at full power.
+        """
+        if not self.is_connected:
+            raise RobotDeviceNotConnectedError(
+                f"TrossenArmDriver({self.ip}) is not connected. You need to run `motors_bus.connect()`."
+            )
+            
+        # Ensure scaling factor is within valid range
+        scaling_factor = max(0.0, min(1.0, scaling_factor))
+        
+        try:
+            # Method 1: Direct API call (preferred)
+            print(f"Setting gripper force limit to {scaling_factor*100:.1f}% of maximum")
+            self.driver.set_gripper_force_limit_scaling_factor(scaling_factor)
+            return True
+        except Exception as e1:
+            print(f"Warning: Failed to set gripper force limit using direct API: {e1}")
+            try:
+                # Method 2: Via end effector properties
+                end_effector = self.driver.get_end_effector()
+                end_effector.t_max_factor = scaling_factor
+                self.driver.set_end_effector(end_effector)
+                return True
+            except Exception as e2:
+                print(f"Error setting gripper force limit scaling factor: {e2}")
+                return False
