@@ -148,6 +148,7 @@ from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.common.policies.factory import make_policy
 from lerobot.common.robot_devices.control_configs import (
     CalibrateControlConfig,
+    ControlConfig,
     ControlPipelineConfig,
     RecordControlConfig,
     RemoteRobotConfig,
@@ -157,6 +158,7 @@ from lerobot.common.robot_devices.control_configs import (
 from lerobot.common.robot_devices.control_utils import (
     control_loop,
     init_keyboard_listener,
+    is_headless,
     log_control_info,
     record_episode,
     reset_environment,
@@ -171,6 +173,8 @@ from lerobot.common.robot_devices.robots.utils import Robot, make_robot_from_con
 from lerobot.common.robot_devices.utils import busy_wait, safe_disconnect
 from lerobot.common.utils.utils import has_method, init_logging, log_say
 from lerobot.configs import parser
+
+import rerun as rr
 
 ########################################################################################
 # Control modes
@@ -233,12 +237,17 @@ def calibrate(robot: Robot, cfg: CalibrateControlConfig):
 
 @safe_disconnect
 def teleoperate(robot: Robot, cfg: TeleoperateControlConfig):
+    log_control_info(robot, dt_s=float("nan"))
+
+    events = {"exit_early": False}
+
+    # Run loop, auto disconnect if error
     control_loop(
-        robot,
+        robot=robot,
         control_time_s=cfg.teleop_time_s,
         fps=cfg.fps,
         teleoperate=True,
-        display_cameras=cfg.display_cameras,
+        display_data=cfg.display_data,
     )
 
 
@@ -327,10 +336,9 @@ def record(
     # 1. teleoperate the robot to move it in starting position if no policy provided,
     # 2. give times to the robot devices to connect and start synchronizing,
     # 3. place the cameras windows on screen
-    # enable_teleoperation = policy is None
-    enable_teleoperation = True
+    enable_teleoperation = policy is None
     log_say("Warmup record", cfg.play_sounds)
-    warmup_record(robot, events, enable_teleoperation, cfg.warmup_time_s, cfg.display_cameras, cfg.fps)
+    warmup_record(robot, events, enable_teleoperation, cfg.warmup_time_s, cfg.display_data, cfg.fps)
 
     # Store the arm positions after warmup - these will be our start positions for each episode
     saved_arm_positions = save_arm_positions(robot)
@@ -365,7 +373,7 @@ def record(
             dataset=dataset,
             events=events,
             episode_time_s=cfg.episode_time_s,
-            display_cameras=cfg.display_cameras,
+            display_data=cfg.display_data,
             policy=policy,
             fps=cfg.fps,
             single_task=cfg.single_task,
@@ -397,7 +405,7 @@ def record(
             break
 
     log_say("Stop recording", cfg.play_sounds, blocking=True)
-    stop_recording(robot, listener, cfg.display_cameras)
+    stop_recording(robot, listener, cfg.display_data)
 
     if cfg.push_to_hub:
         dataset.push_to_hub(tags=cfg.tags, private=cfg.private)
@@ -434,6 +442,40 @@ def replay(
         log_control_info(robot, dt_s, fps=cfg.fps)
 
 
+def _init_rerun(control_config: ControlConfig, session_name: str = "lerobot_control_loop") -> None:
+    """Initializes the Rerun SDK for visualizing the control loop.
+
+    Args:
+        control_config: Configuration determining data display and robot type.
+        session_name: Rerun session name. Defaults to "lerobot_control_loop".
+
+    Raises:
+        ValueError: If viewer IP is missing for non-remote configurations with display enabled.
+    """
+    if (control_config.display_data and not is_headless()) or (
+        control_config.display_data and isinstance(control_config, RemoteRobotConfig)
+    ):
+        # Configure Rerun flush batch size default to 8KB if not set
+        batch_size = os.getenv("RERUN_FLUSH_NUM_BYTES", "8000")
+        os.environ["RERUN_FLUSH_NUM_BYTES"] = batch_size
+
+        # Initialize Rerun based on configuration
+        rr.init(session_name)
+        if isinstance(control_config, RemoteRobotConfig):
+            viewer_ip = control_config.viewer_ip
+            viewer_port = control_config.viewer_port
+            if not viewer_ip or not viewer_port:
+                raise ValueError(
+                    "Viewer IP & Port are required for remote config. Set via config file/CLI or disable control_config.display_data."
+                )
+            logging.info(f"Connecting to viewer at {viewer_ip}:{viewer_port}")
+            rr.connect_tcp(f"{viewer_ip}:{viewer_port}")
+        else:
+            # Get memory limit for rerun viewer parameters
+            memory_limit = os.getenv("LEROBOT_RERUN_MEMORY_LIMIT", "10%")
+            rr.spawn(memory_limit=memory_limit)
+
+
 @parser.wrap()
 def control_robot(cfg: ControlPipelineConfig):
     init_logging()
@@ -444,14 +486,17 @@ def control_robot(cfg: ControlPipelineConfig):
     if isinstance(cfg.control, CalibrateControlConfig):
         calibrate(robot, cfg.control)
     elif isinstance(cfg.control, TeleoperateControlConfig):
+        _init_rerun(control_config=cfg.control, session_name="lerobot_control_loop_teleop")
         teleoperate(robot, cfg.control)
     elif isinstance(cfg.control, RecordControlConfig):
+        _init_rerun(control_config=cfg.control, session_name="lerobot_control_loop_record")
         record(robot, cfg.control)
     elif isinstance(cfg.control, ReplayControlConfig):
         replay(robot, cfg.control)
     elif isinstance(cfg.control, RemoteRobotConfig):
         from lerobot.common.robot_devices.robots.lekiwi_remote import run_lekiwi
 
+        _init_rerun(control_config=cfg.control, session_name="lerobot_control_loop_remote")
         run_lekiwi(cfg.robot)
 
     if robot.is_connected:
