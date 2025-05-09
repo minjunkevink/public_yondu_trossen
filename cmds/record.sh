@@ -26,7 +26,7 @@ python lerobot/scripts/control_robot.py \
 --control.reset_time_s=3 \
 --control.num_episodes=2 \
 --control.push_to_hub=false \
---control.display_cameras=false \
+--control.display_data=false \
 
 
 echo "Recording completed!"
