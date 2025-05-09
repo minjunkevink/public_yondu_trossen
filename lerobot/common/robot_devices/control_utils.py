@@ -319,8 +319,8 @@ def restore_arm_positions(robot, saved_arm_positions):
     if not saved_arm_positions or (not hasattr(robot, "leader_arms") and not hasattr(robot, "follower_arms")):
         return False
         
-    # Hardcoded slow movement time (10 seconds)
-    SLOW_MOVE_TIME = 4.0
+    # Hardcoded slow movement time (seconds)
+    SLOW_MOVE_TIME = 3.0
     
     print(f"Restoring all arms to the saved position with slow movement ({SLOW_MOVE_TIME}s)...")
     
@@ -349,31 +349,30 @@ def restore_arm_positions(robot, saved_arm_positions):
         
         # Now move arms to the saved positions
         
-        # Move leader arms
+        # Move leader arms using the new set_positions method for slow movement if available
         if hasattr(robot, "leader_arms") and robot.leader_arms:
             for arm_name in robot.leader_arms:
                 if arm_name in saved_arm_positions:
                     leader_arm = robot.leader_arms[arm_name]
-                    if hasattr(leader_arm, "write"):
-                        # Set the arm back to the position saved after warmup
-                        leader_arm.write("Goal_Position", saved_arm_positions[arm_name])
-                        
+                    
+                    # Try to use the new set_positions method first for better control of movement time
+                    if hasattr(leader_arm, "set_positions"):
+                        print(f"Using set_positions with slow movement time for leader arm {arm_name}")
+                        leader_arm.set_positions(saved_arm_positions[arm_name], time_to_move=SLOW_MOVE_TIME)
                         print(f"Restored leader arm {arm_name} to saved position")
         
-        # Move follower arms
+        # Move follower arms with same approach
         if hasattr(robot, "follower_arms") and robot.follower_arms:
             for arm_name in robot.follower_arms:
                 if arm_name in saved_arm_positions:
                     follower_arm = robot.follower_arms[arm_name]
-                    if hasattr(follower_arm, "write"):
-                        # Set the arm back to the position saved after warmup
-                        follower_arm.write("Goal_Position", saved_arm_positions[arm_name])
-                        
+                    
+                    # Try to use the new set_positions method first for better control of movement time
+                    if hasattr(follower_arm, "set_positions"):
+                        print(f"Using set_positions with slow movement time for follower arm {arm_name}")
+                        follower_arm.set_positions(saved_arm_positions[arm_name], time_to_move=SLOW_MOVE_TIME)
                         print(f"Restored follower arm {arm_name} to saved position")
         
-        # Wait for arms to reach position
-        print(f"Waiting {SLOW_MOVE_TIME} seconds for all arms to reach their positions...")
-        time.sleep(SLOW_MOVE_TIME)
         
         # Switch back to teleop mode (external effort control) for ONLY the leader arms
         # Follower arms should remain in position mode
