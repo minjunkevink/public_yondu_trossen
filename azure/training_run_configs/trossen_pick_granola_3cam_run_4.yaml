@@ -1,0 +1,32 @@
+metadata:
+  description: "ACT Policy on 200A 100C: 
+  Task Descroption: Pick granola bars 3cam, 200A 100C
+  Variations: Objects: (Positions of granola bars changed), Robot positions: No, Camera positions: No
+  Camera: Wrist , overhead, front"
+  author: "Aravindh"
+  date: "2025-05-13"
+  status: "planned"
+  dataset_name: "trossen_pick_granola_bars_3cam_B_V1_153"
+  results:
+    success_rate: ""
+    convergence_time: ""
+    notes: ""
+
+parameters:
+  dataset:
+    repo_id: "null"
+    
+  policy:
+    type: "act"
+    device: "cuda"
+    use_amp: true
+    n_obs_steps: 1
+
+
+  num_workers: 8   
+  batch_size: 8
+  steps: 200000
+  job_name: "trossen_pick_granola_bars_3cam_B_V1_153"
+    
+  wandb:
+    project: "lerobot"

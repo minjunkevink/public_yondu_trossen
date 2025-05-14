@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import contextlib
 import json
 import os
@@ -1293,11 +1295,12 @@ def merge_datasets(
 
 if __name__ == "__main__":
     # Define source folders and output folder
-    source_folders = ["./datasets/trossen_orange_1_10_400_merged/", 
-                      "./datasets/trossen_put_orange_merged_20_31_100_2cam/",
+    source_folders = ["./datasets/trossen_pick_granola_bars_3cam/trossen_pick_granola_bars_3cam_merged_ss200", 
+                      "./datasets/trossen_pick_granola_bars_3cam_B/trossen_pick_granola_bars_3cam_B_V1_153",
+                      "./datasets/trossen_pick_granola_bars_3cam_C/trossen_pick_granola_bars_3cam_C_merged_102"
                     ]
 
-    output_folder = "./datasets/trossen_orange_500_merged_1cam/"
+    output_folder = "./datasets/granola_experiments/trossen_pick_granola_bars_3cam_200A_153B_102C_full"
 
     # 设置默认FPS
     default_fps = 30
