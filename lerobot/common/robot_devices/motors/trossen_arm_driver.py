@@ -294,16 +294,6 @@ class TrossenArmDriver:
         elif data_name == "Reset":
             self.driver.set_all_modes(trossen.Mode.position)
             self.driver.set_all_positions(self.home_pose, 2.0, False)
-<<<<<<< HEAD
-=======
-        elif data_name == "External_Efforts":
-            self.driver.set_all_external_efforts(values, 0.0, False)
-        # Special case for "Goal_Position_Slow" to use a longer movement time
-        elif data_name == "Goal_Position_Slow":
-            values = np.array(values, dtype=np.float32)
-            self.driver.set_all_positions(values.tolist(), self.SLOW_MOVEMENT_TIME, False)
-            print(f"Moving arm to position with slow movement time: {self.SLOW_MOVEMENT_TIME}s")
->>>>>>> 4afdeb1 (Make restore arm motion smoother and slower)
         else:
             print(f"Data name: {data_name} value: {values} is not supported for writing.")
 
