@@ -489,6 +489,13 @@ def control_robot(cfg: ControlPipelineConfig):
         _init_rerun(control_config=cfg.control, session_name="lerobot_control_loop_teleop")
         teleoperate(robot, cfg.control)
     elif isinstance(cfg.control, RecordControlConfig):
+        # Pass the is_policy_in_radians parameter to the robot configuration
+        if hasattr(robot, 'follower_arms'):
+            for name in robot.follower_arms:
+                if hasattr(robot.follower_arms[name], 'is_policy_in_radians') and hasattr(cfg.control, 'is_policy_in_radians'):
+                    robot.follower_arms[name].is_policy_in_radians = cfg.control.is_policy_in_radians
+                    print(f"Setting follower arm {name} is_policy_in_radians: {cfg.control.is_policy_in_radians}")
+            
         _init_rerun(control_config=cfg.control, session_name="lerobot_control_loop_record")
         record(robot, cfg.control)
     elif isinstance(cfg.control, ReplayControlConfig):

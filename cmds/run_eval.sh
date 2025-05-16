@@ -17,18 +17,17 @@ python lerobot/scripts/control_robot.py \
   --robot.type=trossen_ai_solo \
   --control.type=record \
   --control.fps=30 \
-  --control.single_task="Put the orange in the basket" \
-  --control.repo_id=${HF_USER}/eval_put_orange_run_9_v4\
+  --control.single_task="Put the granolas in the basket" \
+  --control.repo_id=${HF_USER}/eval_trossen_granola_200A_100B\
   --control.tags='["tutorial"]' \
   --control.warmup_time_s=5 \
-  --control.episode_time_s=120 \
+  --control.episode_time_s=60 \
   --control.reset_time_s=30 \
-  --control.num_episodes=5 \
+  --control.num_episodes=10 \
   --control.push_to_hub=true \
-  --control.policy.path=outputs/train/trossen_put_orange_run_9/200000/pretrained_model \
+  --control.policy.path=outputs/train/trossen_pick_granola/trossen_pick_granola_bars_3cam_200A_100B/200000/pretrained_model \
   --control.num_image_writer_processes=1 \
-  --control.start_pos="[-14, 59, 64, -47, 7.9, -4.5, 378]" \
-  --control.display_cameras=false \
+  --control.is_policy_in_radians=true
   
 
 

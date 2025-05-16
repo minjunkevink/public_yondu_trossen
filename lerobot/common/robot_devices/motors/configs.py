@@ -46,3 +46,6 @@ class TrossenArmDriverConfig(MotorsBusConfig):
     ip: str
     model: dict[str, tuple[int, str]]
     mock: bool = False
+    # When True, indicates the policy outputs angles in radians and no conversion is needed
+    # When False, policy outputs in degrees and needs conversion to radians for the robot
+    is_policy_in_radians: bool = False

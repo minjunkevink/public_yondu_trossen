@@ -516,7 +516,7 @@ class ManipulatorRobot:
             if self.config.max_relative_target is not None:
                 present_pos = self.follower_arms[name].read("Present_Position")
                 present_pos = torch.from_numpy(present_pos)
-                #goal_pos = ensure_safe_goal_position(goal_pos, present_pos, self.config.max_relative_target)
+                goal_pos = ensure_safe_goal_position(goal_pos, present_pos, self.config.max_relative_target)
 
             # Used when record_data=True
             follower_goal_pos[name] = goal_pos
@@ -656,6 +656,7 @@ class ManipulatorRobot:
         # Populate output dictionaries and format to pytorch
         obs_dict = {}
         obs_dict["observation.state"] = state
+        # print(f"DEBUG: State: {state}")
         
         # Add RGB and depth images to observation
         for name in self.cameras:
@@ -695,7 +696,7 @@ class ManipulatorRobot:
             if self.config.max_relative_target is not None:
                 present_pos = self.follower_arms[name].read("Present_Position")
                 present_pos = torch.from_numpy(present_pos)
-                # goal_pos = ensure_safe_goal_position(goal_pos, present_pos, self.config.max_relative_target)
+                goal_pos = ensure_safe_goal_position(goal_pos, present_pos, self.config.max_relative_target)
 
             # Save tensor to concat and return
             action_sent.append(goal_pos)

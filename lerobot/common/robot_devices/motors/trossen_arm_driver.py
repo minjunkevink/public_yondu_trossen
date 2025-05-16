@@ -71,6 +71,7 @@ class TrossenArmDriver:
         self.ip = config.ip
         self.model = config.model
         self.mock = config.mock
+        self.is_policy_in_radians = config.is_policy_in_radians
         self.driver = None
         self.calibration = None
         self.is_connected = False
@@ -217,8 +218,9 @@ class TrossenArmDriver:
         if data_name == "Present_Position":
             # Get the positions of the motors
             values = self.driver.get_positions()
-            values[:-1] = np.degrees(values[:-1])  # Convert all joints except gripper
-            values[-1] = values[-1] * 10000  # Convert gripper to range (0-450)
+            if not self.is_policy_in_radians:
+                values[:-1] = np.degrees(values[:-1])  # Convert all joints except gripper
+                values[-1] = values[-1] * 10000  # Convert gripper to range (0-450)
         elif data_name == "Gripper_Force_Limit":
             # Read the current gripper force limit
             values = np.array([self.get_gripper_force_limit_scaling_factor()], dtype=np.float32)
@@ -254,9 +256,11 @@ class TrossenArmDriver:
         # Write the goal position of the motors
         if data_name == "Goal_Position":
             values = np.array(values, dtype=np.float32)
-            # Convert back to radians for joints
-            values[:-1] = np.radians(values[:-1])  # Convert all joints except gripper
-            values[-1] = values[-1] / 10000  # Convert gripper back to range (0-0.045)
+            # Only convert if policy values are in degrees
+            if not self.is_policy_in_radians:
+                # Convert back to radians for joints
+                values[:-1] = np.radians(values[:-1])  # Convert all joints except gripper
+                values[-1] = values[-1] / 10000  # Convert gripper back to range (0-0.045)
             time_to_move = self.compute_time_to_move(values)
             # time_to_move = 0.02 # Setting to a hardcoded values to make the gripper more responsive
             self.driver.set_all_positions(values.tolist(), time_to_move, False)
@@ -466,6 +470,9 @@ class TrossenArmDriver:
             
         # Convert to proper format
         positions = np.array(positions, dtype=np.float32).tolist()
+        if not self.is_policy_in_radians:
+            positions[:-1] = np.radians(positions[:-1])  # Convert all joints except gripper
+            positions[-1] = positions[-1] / 10000  # Convert gripper back to range (0-0.045)
         
         # Use default slow movement time if not specified
         if time_to_move is None:

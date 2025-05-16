@@ -87,6 +87,9 @@ class RecordControlConfig(ControlConfig):
     play_sounds: bool = True
     # Resume recording on an existing dataset.
     resume: bool = False
+    # When True, indicates the policy outputs angles in radians and no conversion is needed
+    # When False, policy outputs in degrees and needs conversion to radians for the robot
+    is_policy_in_radians: bool = False
 
     # Start position of the robot in degs
     start_position: list[float] | None = None
