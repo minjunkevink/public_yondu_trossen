@@ -46,8 +46,8 @@ def ensure_safe_goal_position(
     # Create a mask to only clamp the first 6 joints (indices 0-5)
     # Assuming the tensor shape is consistent with 7 joints
     mask = torch.ones_like(diff)
-    # if len(diff) >= 7:  # Make sure there are at least 7 elements
-    #     mask[6:] = 0  # Set the 7th joint (index 6) and any following joints to 0 in the mask
+    if len(diff) >= 7:  # Make sure there are at least 7 elements
+        mask[6:] = 0  # Set the 7th joint (index 6) and any following joints to 0 in the mask
     
     # Apply the mask to the max_relative_target
     effective_max = max_relative_target_tensor * mask
