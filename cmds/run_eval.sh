@@ -18,17 +18,17 @@ python lerobot/scripts/control_robot.py \
   --control.type=record \
   --control.fps=30 \
   --control.single_task="Put the granolas in the basket" \
-  --control.repo_id=${HF_USER}/eval_trossen_granola_200A_100B\
+  --control.repo_id=${HF_USER}/eval_trossen_granola_3cam_200A_200CDUP_diff\
   --control.tags='["tutorial"]' \
   --control.warmup_time_s=5 \
-  --control.episode_time_s=60 \
+  --control.episode_time_s=120 \
   --control.reset_time_s=30 \
-  --control.num_episodes=10 \
+  --control.num_episodes=6 \
   --control.push_to_hub=true \
-  --control.policy.path=outputs/train/trossen_pick_granola/trossen_pick_granola_bars_3cam_200A_100B/200000/pretrained_model \
+  --control.private=true \
+  --control.policy.path=outputs/train/trossen_pick_granola_bars_3cam_200A_200CDup_diff/checkpoints/200000/pretrained_model \
   --control.num_image_writer_processes=1 \
-  --control.is_policy_in_radians=true
-  
+  --control.is_policy_in_radians=true \
 
 
 echo "Recording completed!"
