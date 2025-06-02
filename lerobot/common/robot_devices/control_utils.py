@@ -327,7 +327,7 @@ def restore_arm_positions(robot, saved_arm_positions):
     try:
         # First enable position mode for precise positioning for both leader and follower arms
         
-        # Handle leader arms
+        # Handle leader arms - they need special treatment since they're normally in external effort mode
         if hasattr(robot, "leader_arms") and robot.leader_arms:
             for arm_name in robot.leader_arms:
                 if arm_name in saved_arm_positions:
@@ -347,8 +347,10 @@ def restore_arm_positions(robot, saved_arm_positions):
                         follower_arm.write("Torque_Enable", 1)
                         print(f"Enabled position mode for follower arm: {arm_name}")
         
-        # Now move arms to the saved positions
-        
+        # CRITICAL: Give leader arms time to fully transition to position mode
+        print("Waiting for leader arms to fully transition to position mode...")
+        time.sleep(1.0)  # Allow time for mode transition
+                
         # Move leader arms using the new set_positions method for slow movement if available
         if hasattr(robot, "leader_arms") and robot.leader_arms:
             for arm_name in robot.leader_arms:
@@ -373,6 +375,9 @@ def restore_arm_positions(robot, saved_arm_positions):
                         follower_arm.set_positions(saved_arm_positions[arm_name], time_to_move=SLOW_MOVE_TIME)
                         print(f"Restored follower arm {arm_name} to saved position")
         
+        # Wait for movement to complete
+        print(f"Waiting {SLOW_MOVE_TIME}s for arms to reach saved positions...")
+        time.sleep(SLOW_MOVE_TIME + 0.5)  # Critical buffer time to ensure the arms reach the saved positions
         
         # Switch back to teleop mode (external effort control) for ONLY the leader arms
         # Follower arms should remain in position mode
@@ -386,7 +391,7 @@ def restore_arm_positions(robot, saved_arm_positions):
                     leader_arm.write("Torque_Enable", 0)
                     print(f"Set leader arm {arm_name} back to external effort mode")
         
-        # Give the system time to stabilize in external effort mode
+        # Give the arms a moment to settle in their final modes
         time.sleep(0.5)
         return True
         
