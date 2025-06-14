@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import draccus
@@ -90,6 +90,16 @@ class RecordControlConfig(ControlConfig):
     # When True, indicates the policy outputs angles in radians and no conversion is needed
     # When False, policy outputs in degrees and needs conversion to radians for the robot
     is_policy_in_radians: bool = False
+
+    # VLM Integration Configuration
+    vlm: dict = field(default_factory=lambda: {
+        "enabled": False,
+        "api_url": None,
+        "api_key": None,
+        "query_interval_s": 1.0,  # How often to query the VLM
+        "max_retries": 3,  # Maximum number of retries for VLM API calls
+        "timeout_s": 5.0,  # Timeout for VLM API calls
+    })
 
     # Start position of the robot in degs
     start_position: list[float] | None = None

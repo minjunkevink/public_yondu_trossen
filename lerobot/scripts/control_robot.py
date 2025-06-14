@@ -344,52 +344,29 @@ def record(
     saved_arm_positions = save_arm_positions(robot)
     print("Preserving the arm position you set during warmup period...", saved_arm_positions)
 
-    if cfg.start_position:
-        position_array = np.array(cfg.start_position, dtype=np.float32)
-        arm_positions = {'main': position_array}
-        saved_arm_positions = arm_positions
-        print(f"Restoring arm positions to {cfg.start_position}")
-        restore_arm_positions(robot, saved_arm_positions)
-
-
-
     recorded_episodes = 0
     while True:
-        if recorded_episodes >= cfg.num_episodes:
-            break
+        log_say(f"Recording episode {dataset.num_episodes}", cfg.play_sounds)
 
-        # For subsequent episodes (not the first one), restore the arm to the saved position
-        if recorded_episodes > 0 and saved_arm_positions:
-            # Use the utility function to restore arm positions and set to teleop mode
-            # Uses a hardcoded slow movement speed for safety
-            restore_arm_positions(robot, saved_arm_positions)
+        if events is None:
+            events = {"exit_early": False}
 
-        # Add a short delay before starting to record
-        time.sleep(2.0)
+        if cfg.episode_time_s is None:
+            cfg.episode_time_s = float("inf")
 
-        log_say(f"\n\nRecording episode {dataset.num_episodes}", cfg.play_sounds)
-        record_episode(
+        # Record episode with VLM integration
+        control_loop(
             robot=robot,
+            control_time_s=cfg.episode_time_s,
+            display_data=cfg.display_data,
             dataset=dataset,
             events=events,
-            episode_time_s=cfg.episode_time_s,
-            display_data=cfg.display_data,
             policy=policy,
             fps=cfg.fps,
+            teleoperate=enable_teleoperation,
             single_task=cfg.single_task,
+            vlm_config=cfg.vlm if cfg.vlm.get("enabled", False) else None
         )
-
-        # Skip reset for the last episode to be recorded
-        if not events["stop_recording"] and (
-            (recorded_episodes < cfg.num_episodes - 1) or events["rerecord_episode"]
-        ):
-            log_say("Reset the environment", cfg.play_sounds)
-            # Instead of using a fixed reset time, wait for user input
-            
-            # Allow the user to manually reset the environment, then press Enter to continue
-            if not wait_for_user_continue():
-                # If input was interrupted, treat as stop_recording
-                events["stop_recording"] = True
 
         if events["rerecord_episode"]:
             log_say("Re-record episode", cfg.play_sounds)
@@ -398,17 +375,20 @@ def record(
             dataset.clear_episode_buffer()
             continue
 
-        dataset.save_episode()
+        dataset.save_episode(task=cfg.single_task)
         recorded_episodes += 1
 
-        if events["stop_recording"]:
+        if events["stop_recording"] or recorded_episodes >= cfg.num_episodes:
             break
+        else:
+            logging.info("Waiting for a few seconds before starting next episode recording...")
+            busy_wait(cfg.reset_time_s)
 
     log_say("Stop recording", cfg.play_sounds, blocking=True)
     stop_recording(robot, listener, cfg.display_data)
 
     if cfg.push_to_hub:
-        dataset.push_to_hub(tags=cfg.tags, private=cfg.private)
+        dataset.push_to_hub(tags=cfg.tags)
 
     log_say("Exiting", cfg.play_sounds)
     return dataset

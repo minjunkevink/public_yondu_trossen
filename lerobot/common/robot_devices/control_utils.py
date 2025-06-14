@@ -23,11 +23,16 @@ import traceback
 from contextlib import nullcontext
 from copy import copy
 from functools import cache
+from typing import Optional, Dict, Any
+import numpy as np
+from PIL import Image
+import io
 
 import rerun as rr
 import torch
 from deepdiff import DeepDiff
 from termcolor import colored
+import cv2
 
 from lerobot.common.datasets.image_writer import safe_stop_image_writer
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
@@ -36,6 +41,7 @@ from lerobot.common.policies.pretrained import PreTrainedPolicy
 from lerobot.common.robot_devices.robots.utils import Robot
 from lerobot.common.robot_devices.utils import busy_wait
 from lerobot.common.utils.utils import get_safe_torch_device, has_method
+from lerobot.common.vlm.vlm_client import VLMClient
 
 
 def log_control_info(robot: Robot, dt_s, episode_index=None, frame_index=None, fps=None):
@@ -213,78 +219,132 @@ def record_episode(
 @safe_stop_image_writer
 def control_loop(
     robot,
-    control_time_s=None,
-    teleoperate=False,
-    display_data=False,
-    dataset: LeRobotDataset | None = None,
-    events=None,
-    policy: PreTrainedPolicy = None,
-    fps: int | None = None,
-    single_task: str | None = None,
+    control_time_s: float,
+    display_data: bool,
+    dataset,
+    events,
+    policy,
+    fps: Optional[int] = None,
+    teleoperate: bool = False,
+    single_task: Optional[str] = None,
+    vlm_config: Optional[Dict[str, Any]] = None,
 ):
-    # TODO(rcadene): Add option to record logs
-    if not robot.is_connected:
-        robot.connect()
-
-    if events is None:
-        events = {"exit_early": False}
-
-    if control_time_s is None:
-        print("Control time is None, setting to infinity")
-        control_time_s = float("inf")
-
-    if teleoperate and policy is not None:
-        raise ValueError("When `teleoperate` is True, `policy` should be None.")
-
-    if dataset is not None and single_task is None:
-        raise ValueError("You need to provide a task as argument in `single_task`.")
-
-    if dataset is not None and fps is not None and dataset.fps != fps:
-        raise ValueError(f"The dataset fps should be equal to requested fps ({dataset['fps']} != {fps}).")
-
-    timestamp = 0
-    start_episode_t = time.perf_counter()
-    while timestamp < control_time_s:
-        start_loop_t = time.perf_counter()
-
-        if teleoperate:
-            observation, action = robot.teleop_step(record_data=True)
-        else:
-            observation = robot.capture_observation()
-
+    """
+    Main control loop for robot operation.
+    
+    Args:
+        robot: The robot instance
+        control_time_s: Duration of control in seconds
+        display_data: Whether to display camera data
+        dataset: Dataset for recording
+        events: Event dictionary for keyboard control
+        policy: Policy for robot control
+        fps: Target frames per second
+        teleoperate: Whether to use teleoperation
+        single_task: Task description for VLM
+        vlm_config: VLM configuration dictionary
+    """
+    # Initialize VLM client if enabled
+    vlm_client = None
+    if vlm_config and vlm_config.get("enabled", False):
+        vlm_client = VLMClient(
+            api_url=vlm_config["api_url"],
+            api_key=vlm_config["api_key"],
+            query_interval_s=vlm_config.get("query_interval_s", 1.0),
+            max_retries=vlm_config.get("max_retries", 3),
+            timeout_s=vlm_config.get("timeout_s", 5.0),
+            max_queue_size=vlm_config.get("max_queue_size", 5),
+            response_timeout_s=vlm_config.get("response_timeout_s", 2.0)
+        )
+    
+    start_time = time.perf_counter()
+    frame_count = 0
+    last_vlm_stats_time = 0
+    vlm_stats_interval = 5.0  # Log VLM stats every 5 seconds
+    
+    try:
+        while time.perf_counter() - start_time < control_time_s:
+            frame_start_time = time.perf_counter()
+            
+            # Get robot state and camera images
+            observation = robot.get_observation()
+            
+            # If VLM is enabled, process the latest camera image
+            vlm_response = None
+            if vlm_client and single_task:
+                # Get the first available camera image
+                camera_image = None
+                for key, value in observation.items():
+                    if isinstance(value, np.ndarray) and len(value.shape) == 3:
+                        camera_image = value
+                        break
+                
+                if camera_image is not None:
+                    # Convert numpy array to JPEG bytes
+                    image = Image.fromarray(camera_image)
+                    img_byte_arr = io.BytesIO()
+                    image.save(img_byte_arr, format='JPEG')
+                    img_byte_arr = img_byte_arr.getvalue()
+                    
+                    # Query VLM
+                    vlm_response = vlm_client.query_vlm(img_byte_arr, single_task)
+                    if vlm_response:
+                        processed_response = vlm_client.process_vlm_response(vlm_response)
+                        if processed_response:
+                            logger.info(f"VLM Response: {processed_response}")
+                            # Here you can use the VLM response to influence robot control
+                            # For example, you could modify the action based on the VLM's analysis
+                
+                # Log VLM latency statistics periodically
+                current_time = time.perf_counter()
+                if current_time - last_vlm_stats_time >= vlm_stats_interval:
+                    mean_latency, std_latency, max_latency = vlm_client.get_latency_stats()
+                    logger.info(f"VLM Latency Stats - Mean: {mean_latency:.3f}s, Std: {std_latency:.3f}s, Max: {max_latency:.3f}s")
+                    last_vlm_stats_time = current_time
+            
+            # Get action from policy or teleoperation
             if policy is not None:
-                pred_action = predict_action(
-                    observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp
-                )
-                # Action can eventually be clipped using `max_relative_target`,
-                # so action actually sent is saved in the dataset.
-                action = robot.send_action(pred_action)
-                action = {"action": action}
-
-        if dataset is not None:
-            frame = {**observation, **action, "task": single_task}
-            dataset.add_frame(frame)
-
-        if (display_data and not is_headless()) or (display_data and robot.robot_type.startswith("lekiwi")):
-            for k, v in action.items():
-                for i, vv in enumerate(v):
-                    rr.log(f"sent_{k}_{i}", rr.Scalar(vv.numpy()))
-
-            image_keys = [key for key in observation if "image" in key]
-            for key in image_keys:
-                rr.log(key, rr.Image(observation[key].numpy()), static=True)
-
-        if fps is not None:
-            dt_s = time.perf_counter() - start_loop_t
-            busy_wait(1 / fps - dt_s)
-
-        dt_s = time.perf_counter() - start_loop_t
-        log_control_info(robot, dt_s, fps=fps)
-
-        timestamp = time.perf_counter() - start_episode_t
-        if events["exit_early"]:
-            events["exit_early"] = False
-            break
+                action = policy.predict(observation)
+            elif teleoperate:
+                action = robot.teleop_step()
+            else:
+                action = None
+            
+            if action is not None:
+                robot.send_action(action)
+            
+            # Record data if dataset is provided
+            if dataset is not None:
+                frame = {
+                    "action": action,
+                    "observation": observation,
+                }
+                if vlm_response:
+                    frame["vlm_response"] = vlm_response
+                dataset.add_frame(frame)
+            
+            # Display data if requested
+            if display_data:
+                for key, value in observation.items():
+                    if isinstance(value, np.ndarray) and len(value.shape) == 3:
+                        cv2.imshow(key, cv2.cvtColor(value, cv2.COLOR_RGB2BGR))
+                cv2.waitKey(1)
+            
+            # Control loop timing
+            frame_count += 1
+            if fps is not None:
+                dt = time.perf_counter() - frame_start_time
+                if dt < 1.0 / fps:
+                    time.sleep(1.0 / fps - dt)
+            
+            # Check for early exit
+            if events.get("exit_early", False):
+                break
+                
+    finally:
+        # Clean shutdown of VLM client
+        if vlm_client:
+            vlm_client.shutdown()
 
 
 def reset_environment(robot, events, reset_time_s, fps):
